@@ -1,8 +1,7 @@
 import os
 import argparse
 
-from utils_new import  create_directory, getAngle
-from utils import get_all_filepaths
+from utils.utils_new import  create_directory, getAngle,get_all_filepaths
 from tqdm import tqdm
 from datetime import datetime
 import shutil
@@ -11,8 +10,8 @@ def argparser():
     parser = argparse.ArgumentParser()
     parser.add_argument('--out_dir', default=r'/home/rokp/test/images_extract', type=str, help='Output directory where the embeddings will be saved.')
     parser.add_argument('--target', default='txt', type=str, help='What images to copy (txt or frontal(of all people))')    
-    parser.add_argument('--inputs', default=r'/home/rokp/test/images_mtcnn', type=str, help='A file containing the names of test images, an input image or a directory containing the input images.') 
-    parser.add_argument('--txt', default='/home/rokp/test/launch_images.txt', type=str, help='Directory to text file.')     
+    parser.add_argument('--inputs', default=r'/home/rokp/test/images/images_raw_jpg', type=str, help='A file containing the names of test images, an input image or a directory containing the input images.') 
+    parser.add_argument('--txt', default='/home/rokp/test/strojni/launch/launch_test_arcface.txt', type=str, help='Directory to text file.')     
     args = parser.parse_args()
     return args
 
@@ -41,10 +40,10 @@ def check_img_requirements_person(img_name, people):
     person_new = img_name[0:3] 
     if person_new in people:
         if img_name[7:9] == '01':                       
-            if img_name[14:16] in ['08']: #'07',
+            #if img_name[14:16] in ['08']: #'07',
                 face_viewpoint = img_name[10:13]
-                #if face_viewpoint in ['130', '140', '051', '050', '041']: 
-                return True
+                if face_viewpoint in ['130', '140', '051', '050', '041']: 
+                    return True
             
     return False
 

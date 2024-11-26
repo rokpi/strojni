@@ -1,7 +1,6 @@
 import numpy as np
-from utils_new import load_data_df, cosine_similarity, create_directory, get_all_angles, ang_to_str
-from utils_test import find_matrix
-from test_rotation_space import find_centroid
+from utils.utils_new import load_data_df, cosine_similarity, create_directory, get_all_angles, ang_to_str
+from utils.utils_test import find_matrix, find_centroid
 from tqdm import tqdm
 import pandas as pd
 import math
@@ -56,9 +55,12 @@ def calculate_average_weight(embedding,embedding2,result1, result2, type, weight
   embedding = np.mean(embeddings1, axis = 0)
   return embedding, embedding2
 
-def clean_df(df, array):
+def clean_df(df, array, angles = None):
   img_dirs = array[:, 1]
-  df.columns = ['person', 'img_dir','angle', 'embedding'] #
+  if angles:
+    df.columns = ['person', 'img_dir','angle', 'embedding'] 
+  else:
+    df.columns = ['person', 'img_dir', 'embedding']
   mask = ~df.set_index(['img_dir']).index.isin(
     img_dirs
   )
@@ -193,13 +195,13 @@ def check(array_cleaned, array_test, what, all_centroids, angles = None):
                   num += 1
 
             #if it is not the same angle
-            #embedding_new = embedding
+            embedding_new = embedding
             '''if results[j] != 0:
                 embedding2_cent = all_centroids[results2[j]]
                 vector = embedding_cent-embedding2_cent
                 embedding2 += vector'''
             #embedding_new, embedding2 = rotate_embedding_both(embedding,embedding2, 5, result1, results2[j], all_centroids, embedding_cent)
-            embedding_new, embedding2 = calculate_average_weight(embedding,embedding2,result1, results2[j],'both', weights, all_centroids)
+            #embedding_new, embedding2 = calculate_average_weight(embedding,embedding2,result1, results2[j],'both', weights, all_centroids)
 
             if num > 2:
                 raise ValueError("Preveč napak")
@@ -216,18 +218,25 @@ def check(array_cleaned, array_test, what, all_centroids, angles = None):
 
 
 def main():
-  df = load_data_df('/home/rokp/test/test/dataset/mtcnn/adaface/20241125_125326_ada_vse/adaface_images_mtcnn.npz')
+  df = load_data_df('/home/rokp/test/test/dataset/mtcnn/resnet-resnet/20241126_154814/resnet-resnetmtcnn_images_raw_jpg.npz')
+  print(df)
   centroid_directory = '/home/rokp/test/bulk/20241125_125803_cent_ada_vse'
   out_dir = '/home/rokp/test/test/ROC'
   total = 50
   loop = False
-  all_angles = get_all_angles()#df['angle'].unique().tolist()
-  all_angles.sort()
+  angles_are = True
+
+  if angles_are:
+    cent_angles = df['angle'].unique().tolist()
+    cent_angles.sort()
+    angles = cent_angles
+  else:
+    cent_angles = get_all_angles()#
   all_centroids = []
   #selection = [-90,-85,-80,-30,0,30,80,85,90]
-  for i in range(len(all_angles)):
+  for i in range(len(cent_angles)):
       #if all_angles[i] in selection:
-        centroid_str =  f"Centroid_{ang_to_str(all_angles[i])}.npy"
+        centroid_str =  f"Centroid_{ang_to_str(cent_angles[i])}.npy"
         centroid_dir = find_centroid(centroid_str, centroid_directory)
         vector = np.load(centroid_dir)
         #vector /=np.linalg.norm(vector)
@@ -252,16 +261,16 @@ def main():
     print(f"{i}/{total}")
     #random picture of person, comparison with pictures of that person
     sim_one_arr = np.array(df.groupby('person').apply(lambda x: x.sample(1)).reset_index(drop=True).copy(deep=True).values)
-    sim_cleaned = clean_df(df, sim_one_arr)
+    sim_cleaned = clean_df(df, sim_one_arr, angles = angles)
 
     df_cleaned = pd.DataFrame(sim_cleaned)
 
     #one random picture taken df_cleaned for every person and compared between different identities
     dif_one_arr = np.array(df_cleaned.groupby(0).apply(lambda x: x.sample(1)).reset_index(drop=True).values)
-    dif_cleaned = clean_df(df, dif_one_arr)
+    dif_cleaned = clean_df(df, dif_one_arr, angles= angles)
 
-    similarity1, wrong1, right1 = check(sim_cleaned, sim_one_arr, 'sim', all_centroids, angles=all_angles)#
-    difference1, wrong2, right2 = check(dif_cleaned, dif_one_arr,'dif', all_centroids, angles=all_angles)#
+    similarity1, wrong1, right1 = check(sim_cleaned, sim_one_arr, 'sim', all_centroids, angles= angles)#
+    difference1, wrong2, right2 = check(dif_cleaned, dif_one_arr,'dif', all_centroids, angles= angles)#
 
     similarity_scores = np.array(similarity1 + difference1)
     true_labels =np.concatenate((np.ones([1, len(similarity1)]), np.zeros([1, len(difference1)])), axis = 1)

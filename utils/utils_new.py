@@ -123,7 +123,7 @@ def load_data_df(in_directory):
 
     #convert 'embedding' back to numpy array
     df['embedding'] = df['embedding'].apply(lambda x: np.array(x))
-    return df
+    return df   
 
 def getAngle(filename):
     basename = os.path.basename(filename)

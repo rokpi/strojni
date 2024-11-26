@@ -2,8 +2,7 @@ import os
 import numpy as np
 from tqdm import tqdm
 import pandas as pd
-from utils_new import get_all_angles
-from utils_test import ang_to_str
+from utils.utils_new import get_all_angles, ang_to_str
 
 def calculate_tempCentre(df):
     #Keeps all the angles and img_dirs while grouping

@@ -12,10 +12,9 @@ class ImageDataset(Dataset):
     def __init__(self, df):
         self.df = df
         self.transform = transforms.Compose([
-            transforms.Resize((112, 112)),  # Če ni prave velikosti
-            transforms.CenterCrop((112, 112)),  # Izreži center
-            transforms.ToTensor(),  # Pretvori v tensor
-            transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])  # Normalizacija
+            transforms.Resize((112, 112)),
+            transforms.ToTensor(),
+            #transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])  # Normalizacija
         ])
 
     def __len__(self):

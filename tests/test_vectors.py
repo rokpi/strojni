@@ -1,11 +1,13 @@
 import os
 import numpy as np
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.getcwd(), 'strojni')))
 from tqdm import tqdm
-from utils_new import create_directory, load_data_df, cosine_similarity
+from utils.utils_new import create_directory, load_data_df, cosine_similarity,ang_to_str
 from datetime import datetime
-from apply_vector import init_decoder
-from utils_test import ang_to_str, find_matrix, tranform_to_img, read_txt
-from utils_pca import get_pca_vectors, define_true_vector
+from base.apply_vector import init_decoder
+from utils.utils_test import find_matrix, tranform_to_img, read_txt
+from utils.utils_pca import get_pca_vectors, define_true_vector
 
 def main():
     vec_directory = '/home/rokp/test/centroid/20240911_121715'
@@ -202,7 +204,7 @@ if __name__ == '__main__':
 
     # Uporaba funkcije
     txt = "/home/rokp/test/pairs_CPLFW.txt"
-    source_dir = "/home/rokp/test/images_mtcnn_cplfw"
+    source_dir = "/home/rokp/test/images/images_cplfw copy"
     main_directory = "/home/rokp/test/images_lfw"  # Zamenjaj s potjo do svoje mape
     #delete_files_in_txt(txt, source_dir)
     rename_files(source_dir)

@@ -1,6 +1,6 @@
 import os
 import argparse
-from utils_new import model_to_str, getAngle, create_directory, get_all_filepaths
+from utils.utils_new import model_to_str, getAngle, create_directory, get_all_filepaths
 from tqdm import tqdm
 import numpy as np
 from pathlib import Path
@@ -9,8 +9,10 @@ import pandas as pd
 #import tensorflow as tf
 #from utils_exceptions import encoder_layer
 from datetime import datetime
-from models.AdaFace.inference import load_pretrained_model, img_to_embedding
-from extract_embedds_ada import process_and_save_embeddings
+import sys
+sys.path.append('/home/rokp/test')
+from models.AdaFace.inference import process_and_save_embeddings, load_pretrained_model
+#from extract_embedds_ada import process_and_save_embeddings
 import torch
 
 def argparser():

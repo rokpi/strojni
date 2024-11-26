@@ -3,19 +3,8 @@ import numpy as np
 from tqdm import tqdm
 from utils_new import load_data_df, get_all_angles, cosine_similarity, ang_to_str
 from datetime import datetime
-from utils_test import read_txt
+from utils_test import read_txt, find_centroid
 
-def find_centroid(centroid_str, directory):
-    dirs = []    
-    for in_file in os.listdir(directory):
-        if centroid_str == in_file:
-            dirs.append(os.path.join(directory, in_file))
-    if len(dirs)>1:
-        raise ValueError(f"Too many rotation matrixes in directory with this name: {centroid_str}")
-    elif len(dirs) == 0:
-        raise ValueError(f"No files in directory with this name: {centroid_str}")
-    else:
-        return dirs[0]
     
 def recognise_angle_space(embedding, global_mean, all_centroids):
     embedding = np.subtract(embedding,global_mean)
