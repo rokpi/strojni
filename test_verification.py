@@ -216,10 +216,21 @@ def check(array_cleaned, array_test, what, all_centroids, angles = None):
 
     return difference, wrong, right
 
+def compare_embeddings(df, df1):
+    if len(df) != len(df1):
+        return False  # Različna dolžina, torej niso enaki
+
+    for i in range(len(df)):
+        emb1 = df['embedding'].iloc[i]
+        emb2 = df1['embedding'].iloc[i]
+
+        if not np.allclose(emb1, emb2, atol=1e-5):
+            return False
+
+    return True
 
 def main():
-  df = load_data_df('/home/rokp/test/test/dataset/mtcnn/resnet-resnet/20241126_154814/resnet-resnetmtcnn_images_raw_jpg.npz')
-  print(df)
+  df = load_data_df('/home/rokp/test/dataset/swinface/20241202_151655/resnet-resnetmtcnn_images_mtcnn.npz')
   centroid_directory = '/home/rokp/test/bulk/20241125_125803_cent_ada_vse'
   out_dir = '/home/rokp/test/test/ROC'
   total = 50
@@ -269,9 +280,12 @@ def main():
     dif_one_arr = np.array(df_cleaned.groupby(0).apply(lambda x: x.sample(1)).reset_index(drop=True).values)
     dif_cleaned = clean_df(df, dif_one_arr, angles= angles)
 
-    similarity1, wrong1, right1 = check(sim_cleaned, sim_one_arr, 'sim', all_centroids, angles= angles)#
-    difference1, wrong2, right2 = check(dif_cleaned, dif_one_arr,'dif', all_centroids, angles= angles)#
-
+    if angles_are:
+      similarity1, wrong1, right1 = check(sim_cleaned, sim_one_arr, 'sim', all_centroids, angles= angles)#
+      difference1, wrong2, right2 = check(dif_cleaned, dif_one_arr,'dif', all_centroids, angles= angles)#
+    else:
+      similarity1, wrong1, right1 = check(sim_cleaned, sim_one_arr, 'sim', all_centroids)
+      difference1, wrong2, right2 = check(dif_cleaned, dif_one_arr,'dif', all_centroids)
     similarity_scores = np.array(similarity1 + difference1)
     true_labels =np.concatenate((np.ones([1, len(similarity1)]), np.zeros([1, len(difference1)])), axis = 1)
     true_labels = true_labels.ravel()

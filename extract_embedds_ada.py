@@ -22,18 +22,17 @@ class ImageDataset(Dataset):
 
     def __getitem__(self, idx):
         row = self.df.iloc[idx]
-        img = Image.open(row['img_dir']).convert('RGB')
-        transformed_img = self.transform(img)
         return {
             'person': row['person'], # Dodatni podatek
-            'img': transformed_img,  # Tensor slike
+            'tensor': row['tensor'],  # Tensor slike
             'angle': row['angle'],   # Dodatni podatek
             'img_dir': row['img_dir'] # Pot do slike
         }
 
 # Inicializacija modela in podatkov
-def process_and_save_embeddings(df, model, output_dir):
-
+def process_and_save_embeddings(model, output_dir):
+    df = pd.read_pickle('/home/rokp/test/test/20241202_084132')
+    print(df)
     os.makedirs(os.path.dirname(output_dir), exist_ok=True)
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -46,7 +45,7 @@ def process_and_save_embeddings(df, model, output_dir):
 
     with torch.no_grad():
         for batch in tqdm(dataloader, desc="Processing batches", unit="batch"):
-            images = batch['img'].to(device)
+            images = torch.stack([torch.tensor(img) for img in batch['img_tensor']]).to(device)
             features, _ = model(images)  # Izračunaj embeddinge
             embeddings = features.cpu().numpy()  # Pretvori v NumPy
 
