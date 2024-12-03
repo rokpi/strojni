@@ -1,6 +1,6 @@
 import os
 import argparse
-from utils.utils_new import getAngle, create_directory, get_all_filepaths
+from my_utils.utils_new import getAngle, create_directory, get_all_filepaths
 import pandas as pd
 from datetime import datetime
 from save_swinface import process_and_save_embeddings

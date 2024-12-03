@@ -1,6 +1,5 @@
 import numpy as np
-from utils.utils_new import load_data_df, cosine_similarity, create_directory, get_all_angles, ang_to_str
-from utils.utils_test import find_matrix, find_centroid
+from my_utils.utils_new import find_centroid, load_data_df, cosine_similarity, create_directory, get_all_angles, ang_to_str
 from tqdm import tqdm
 import pandas as pd
 import math
@@ -76,21 +75,17 @@ def calculate_needed(fpr, tpr):
   fpr_1_mask = fpr-0.01
   fpr_1_idx = int(np.argmin(np.abs(fpr_1_mask)))
 
-  print(f"eer:({fpr[eer_idx]:.5f},{tpr[eer_idx]:.5f})")
+  '''print(f"eer:({fpr[eer_idx]:.5f},{tpr[eer_idx]:.5f})")
   print(f"fpr01:({fpr[fpr_01_idx]:.5f},{tpr[fpr_01_idx]:.5f})")
-  print(f"fpr1:({fpr[fpr_1_idx]:.5f},{tpr[fpr_1_idx]:.5f})")
+  print(f"fpr1:({fpr[fpr_1_idx]:.5f},{tpr[fpr_1_idx]:.5f})")'''
   return tpr[eer_idx], tpr[fpr_01_idx], tpr[fpr_1_idx]
 
 def save_graphs(similarity1, difference1, out_directory):
-  similarity_scores = np.array(similarity1 + difference1)
+  similarity_scores = np.concatenate((similarity1,difference1))
   true_labels =np.concatenate((np.ones([1, len(similarity1)]), np.zeros([1, len(difference1)])), axis = 1)
   true_labels = true_labels.ravel()
   similarity_scores = similarity_scores.ravel()
-  similarity_scores = np.abs(similarity_scores)
-
-  fpr, tpr, thresholds = roc_curve(true_labels, similarity_scores)  
-  calculate_needed(fpr, tpr)
-  # Izračunamo AUC (Area Under the Curve)
+  fpr, tpr, thresholds = roc_curve(true_labels, similarity_scores) 
   roc_auc = auc(fpr, tpr)
 
   plt.figure()
@@ -128,7 +123,7 @@ def save_graphs(similarity1, difference1, out_directory):
 
   return overlap_area
 
-def check(array_cleaned, array_test, what, all_centroids, angles = None):
+def check(array_cleaned, array_test, what, all_centroids, angles = None, all = True):
     all_count = len(array_cleaned)
     #weights = [10,8,6,4,0,2,0,4,6,8,10]
     weights = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
@@ -195,26 +190,64 @@ def check(array_cleaned, array_test, what, all_centroids, angles = None):
                   num += 1
 
             #if it is not the same angle
-            embedding_new = embedding
-            '''if results[j] != 0:
-                embedding2_cent = all_centroids[results2[j]]
-                vector = embedding_cent-embedding2_cent
-                embedding2 += vector'''
-            #embedding_new, embedding2 = rotate_embedding_both(embedding,embedding2, 5, result1, results2[j], all_centroids, embedding_cent)
-            #embedding_new, embedding2 = calculate_average_weight(embedding,embedding2,result1, results2[j],'both', weights, all_centroids)
-
+            if all:
+              dif_sim = check_all(embedding, embedding2, all_centroids, embedding_cent, result1, results2[j], results[j], weights)
+            else:
+              embedding_new = embedding
+              '''if results[j] != 0:
+                  embedding2_cent = all_centroids[results2[j]]
+                  vector = embedding_cent-embedding2_cent
+                  embedding2 += vector'''
+              #embedding_new, embedding2 = rotate_embedding_both(embedding,embedding2, 5, result1, results2[j], all_centroids, embedding_cent)
+              #embedding_new, embedding2 = calculate_average_weight(embedding,embedding2,result1, results2[j],'both', weights, all_centroids)
+              dif_sim = cosine_similarity(embedding_new, embedding2)
             if num > 2:
                 raise ValueError("Preveč napak")
 
             right += 2 - num
             wrong += num
-            dif_sim = cosine_similarity(embedding_new, embedding2)
+
             difference.append(dif_sim)
 
         if all_count <= 1:
             break
 
     return difference, wrong, right
+
+def compute_cosine_similarities(embedding_pairs, epsilon=1e-8):
+    # Dobimo embedding1 in embedding2 za vse pare
+    embedding1 = embedding_pairs[:, 0, :]
+    embedding2 = embedding_pairs[:, 1, :]
+    
+    # Norme embeddingov
+    norm1 = np.linalg.norm(embedding1, axis=1, keepdims=True)
+    norm2 = np.linalg.norm(embedding2, axis=1, keepdims=True)
+    
+    # Kosinusna podobnost
+    dot_products = np.sum(embedding1 * embedding2, axis=1, keepdims=True)
+    cosine_similarities = dot_products / (np.maximum(norm1 * norm2, epsilon))
+    
+    return cosine_similarities.squeeze()
+
+def check_all(embedding, embedding2, all_centroids, embedding_cent, result1, result2, difference, weights):
+  final_embeddings = [embedding for _ in range(10)]
+  final_embeddings = np.array(final_embeddings).reshape(5,2,-1)
+  final_embeddings[0][1] = embedding2
+  if difference != 0:
+      embedding2_cent = all_centroids[result2]
+      vector = embedding_cent-embedding2_cent
+      embedding2 += vector
+  final_embeddings[1][1] = embedding2    
+  embedding_new, embedding2 = rotate_embedding_both(embedding,embedding2, 5, result1, result2, all_centroids, embedding_cent)
+  final_embeddings[2][0] = embedding_new
+  final_embeddings[2][1] = embedding2
+  embedding_new, embedding2 = calculate_average_weight(embedding,embedding2,result1, result2,'one', weights, all_centroids)
+  final_embeddings[3][1] = embedding2
+  embedding_new, embedding2 = calculate_average_weight(embedding,embedding2,result1, result2,'both', weights, all_centroids)
+  final_embeddings[4][0] = embedding
+  final_embeddings[4][1] = embedding2
+  dif_sim = compute_cosine_similarities(final_embeddings)
+  return dif_sim
 
 def compare_embeddings(df, df1):
     if len(df) != len(df1):
@@ -230,12 +263,14 @@ def compare_embeddings(df, df1):
     return True
 
 def main():
-  df = load_data_df('/home/rokp/test/dataset/swinface/20241202_151655/resnet-resnetmtcnn_images_mtcnn.npz')
-  centroid_directory = '/home/rokp/test/bulk/20241125_125803_cent_ada_vse'
+  df = load_data_df('/home/rokp/test/dataset/cosface/20241202_125350_vse/cosface.npz')
+  centroid_directory = '/home/rokp/test/bulk/20241203_161407_cent_cosface_vse'
   out_dir = '/home/rokp/test/test/ROC'
   total = 50
-  loop = False
+  loop = True
   angles_are = True
+  b_check_all = True
+  descriptions = ["Normal", "Rotate One", "Rotate Both", "Average one", "Average both"]
 
   if angles_are:
     cent_angles = df['angle'].unique().tolist()
@@ -243,6 +278,7 @@ def main():
     angles = cent_angles
   else:
     cent_angles = get_all_angles()#
+    angles = None
   all_centroids = []
   #selection = [-90,-85,-80,-30,0,30,80,85,90]
   for i in range(len(cent_angles)):
@@ -272,72 +308,72 @@ def main():
     print(f"{i}/{total}")
     #random picture of person, comparison with pictures of that person
     sim_one_arr = np.array(df.groupby('person').apply(lambda x: x.sample(1)).reset_index(drop=True).copy(deep=True).values)
-    sim_cleaned = clean_df(df, sim_one_arr, angles = angles)
+    sim_cleaned = clean_df(df, sim_one_arr, angles = cent_angles)
 
     df_cleaned = pd.DataFrame(sim_cleaned)
 
     #one random picture taken df_cleaned for every person and compared between different identities
     dif_one_arr = np.array(df_cleaned.groupby(0).apply(lambda x: x.sample(1)).reset_index(drop=True).values)
-    dif_cleaned = clean_df(df, dif_one_arr, angles= angles)
+    dif_cleaned = clean_df(df, dif_one_arr, angles= cent_angles)
 
-    if angles_are:
-      similarity1, wrong1, right1 = check(sim_cleaned, sim_one_arr, 'sim', all_centroids, angles= angles)#
-      difference1, wrong2, right2 = check(dif_cleaned, dif_one_arr,'dif', all_centroids, angles= angles)#
-    else:
-      similarity1, wrong1, right1 = check(sim_cleaned, sim_one_arr, 'sim', all_centroids)
-      difference1, wrong2, right2 = check(dif_cleaned, dif_one_arr,'dif', all_centroids)
+    similarity1, wrong1, right1 = check(sim_cleaned, sim_one_arr, 'sim', all_centroids, angles= angles, all = b_check_all)#
+    difference1, wrong2, right2 = check(dif_cleaned, dif_one_arr,'dif', all_centroids, angles= angles, all=b_check_all)#
+  
     similarity_scores = np.array(similarity1 + difference1)
     true_labels =np.concatenate((np.ones([1, len(similarity1)]), np.zeros([1, len(difference1)])), axis = 1)
     true_labels = true_labels.ravel()
-    similarity_scores = similarity_scores.ravel()
-    similarity_scores = np.abs(similarity_scores)
-    fpr, tpr, thresholds = roc_curve(true_labels, similarity_scores) 
-    eer, tpr01, tpr1 = calculate_needed(fpr, tpr)
-    eer_all.append(eer)
-    tpr_01_all.append(tpr01)
-    tpr_1_all.append(tpr1)
+    #similarity_scores = similarity_scores.ravel()
+    #similarity_scores = np.abs(similarity_scores)
 
-  with open(os.path.join(filepath, "roc_data.txt"), "w") as file:
-    file.write("eer\n")
-    file.write(f"{np.mean(eer_all):.5f}\n")
-    file.write(f"{np.min(eer_all):.5f}\n")
-    file.write(f"{np.max(eer_all):.5f}\n")
-    file.write("tpr_01\n")    
-    file.write(f"{np.mean(tpr_01_all):.5f}\n")
-    file.write(f"{np.min(tpr_01_all):.5f}\n")
-    file.write(f"{np.max(tpr_01_all):.5f}\n")
-    file.write("tpr_1\n")    
-    file.write(f"{np.mean(tpr_1_all):.5f}\n")
-    file.write(f"{np.min(tpr_1_all):.5f}\n")
-    file.write(f"{np.max(tpr_1_all):.5f}\n")
-  
-  '''print(f"eer\n  Avg: {np.mean(eer_all):.5f}\n  Min: {np.min(eer_all):.5f}\n  Max: {np.max(eer_all):.5f}")
-  print(f"tpr_01\n  Avg: {np.mean(tpr_01_all):.5f}\n  Min: {np.min(tpr_01_all):.5f}\n  Max: {np.max(tpr_01_all):.5f}")
-  print(f"tpr_1\n  Avg: {np.mean(tpr_1_all):.5f}\n  Min: {np.min(tpr_1_all):.5f}\n  Max: {np.max(tpr_1_all):.5f}")'''
-  #out_directory = create_directory(os.path.join(filepath, f"{i}_from_{total}"))
-  overlap_area = save_graphs(similarity1, difference1, filepath)
-  #my_ROC(similarity1, difference1, filepath)
-  '''bins = np.linspace(-0.3, 1, 10000)
+    eer_tmp = []
+    tpr01_tmp = []
+    tpr1_tmp = []
+    for i in range(similarity_scores.shape[1]):
+      tmp_scores = similarity_scores[:, i].ravel()
+      fpr, tpr, thresholds = roc_curve(true_labels, tmp_scores) 
+      eer, tpr01, tpr1 = calculate_needed(fpr, tpr)
+      eer_tmp.append(eer)
+      tpr01_tmp.append(tpr01)
+      tpr1_tmp.append(tpr1)
 
-  hist1, _ = np.histogram(similarity1, bins=bins, density=True)
-  hist2, _ = np.histogram(difference1, bins=bins, density=True)
-  overlap_area = np.sum(np.minimum(hist1, hist2) * np.diff(bins))
-  all_arrea.append(overlap_area)
-
-  print(all_arrea)
-  print(f"Avg: {np.mean(all_arrea):.5f}\nMin: {np.min(all_arrea):.5f}\nMax: {np.max(all_arrea):.5f}")
-  print("Similarity")
-  print(f"Right: {right1}\nWrong: {wrong1}\nPercent: {right1/(right1 + wrong1)}")
-
-  print("\nDifference")
-  print(f"Right: {right2}\nWrong: {wrong2}\nPercent: {right2/(right2 + wrong2)}")'''
+    eer_all.append(eer_tmp)
+    tpr_01_all.append(tpr01_tmp)
+    tpr_1_all.append(tpr1_tmp)
 
 
+  eer_all_array = np.array(eer_all)
+  tpr_01_all_array = np.array(tpr_01_all)
+  tpr_1_all_array = np.array(tpr_1_all)
 
+  eer_df = process_table(eer_all_array, "EER")
+  tpr_01_df = process_table(tpr_01_all_array, "TPR_01")
+  tpr_1_df = process_table(tpr_1_all_array, "TPR_1")
 
+  final_df = pd.concat([eer_df, tpr_01_df, tpr_1_df], axis=1) 
 
+  final_df['Description'] = descriptions[:similarity_scores.shape[1]]
+  final_df.to_excel(os.path.join(filepath,"data.xlsx"), index=False)
+  similarity1 = np.array(similarity1)
+  difference1 = np.array(difference1)
+  for i in range(similarity_scores.shape[1]):  
+    directory = os.path.join(filepath, descriptions[i])
+    os.makedirs(directory, exist_ok=True)
+    overlap_area = save_graphs(similarity1[:,i], difference1[:,i], directory)
 
-       
+def process_table(data, table_name):
+    # Povprečje po vrsticah
+    mean_values = np.mean(data, axis=0)
+    max_values = np.max(data, axis=0)
+    min_values = np.min(data, axis=0)
+    
+    # Združimo vse v eno DataFrame
+    result_df = pd.DataFrame({
+        f"{table_name}_mean": mean_values,
+        f"{table_name}_max": max_values,
+        f"{table_name}_min": min_values
+    })
+    return result_df
+   
 
   
 if __name__ == '__main__':

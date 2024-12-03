@@ -3,13 +3,13 @@ import os
 import numpy as np
 import argparse
 from tqdm import tqdm
-from utils_new import create_directory, load_data_df, ang_to_str, divide_dataframe_one, get_all_angles
+from my_utils.utils_new import create_directory, load_data_df, ang_to_str, divide_dataframe_one, get_all_angles
 from datetime import datetime
 import pandas as pd
 
 def argparser():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--inputs', default=r'/home/rokp/test/test/dataset/mtcnn/resnet-resnet/20241125_125326/resnet-resnetmtcnn_images_mtcnn.npz', type=str, help='Path to the embeddings')
+    parser.add_argument('--inputs', default=r'/home/rokp/test/dataset/adaface/ada.npz', type=str, help='Path to the embeddings')
     parser.add_argument('--out_dir', default=r'/home/rokp/test/bulk', type=str, help='Output directory where the embeddings will be saved.')
     args = parser.parse_args()
     return args

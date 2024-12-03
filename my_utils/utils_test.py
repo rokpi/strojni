@@ -1,22 +1,10 @@
 import os
-from utils.utils_new import rotational_to_cartesian
-from utils.utils_exceptions import define_tranform
-from utils.utils import restore_original_image_from_array
+from my_utils.utils_new import rotational_to_cartesian
+from my_utils.utils_exceptions import define_tranform
+from my_utils.utils import restore_original_image_from_array
 from tensorflow.keras.preprocessing.image import save_img
 from pathlib import Path
 import numpy as np
-
-def find_centroid(centroid_str, directory):
-    dirs = []    
-    for in_file in os.listdir(directory):
-        if centroid_str == in_file:
-            dirs.append(os.path.join(directory, in_file))
-    if len(dirs)>1:
-        raise ValueError(f"Too many rotation matrixes in directory with this name: {centroid_str}")
-    elif len(dirs) == 0:
-        raise ValueError(f"No files in directory with this name: {centroid_str}")
-    else:
-        return dirs[0]
     
 def find_matrix(neut, pos, directory):
     matrix_str = f"{ang_to_str(neut)}_to_{ang_to_str(pos)}.npy"

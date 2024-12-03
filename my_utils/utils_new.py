@@ -4,6 +4,18 @@ import pandas as pd
 from pathlib import Path
 from datetime import datetime
 
+def find_centroid(centroid_str, directory):
+    dirs = []    
+    for in_file in os.listdir(directory):
+        if centroid_str == in_file:
+            dirs.append(os.path.join(directory, in_file))
+    if len(dirs)>1:
+        raise ValueError(f"Too many rotation matrixes in directory with this name: {centroid_str}")
+    elif len(dirs) == 0:
+        raise ValueError(f"No files in directory with this name: {centroid_str}")
+    else:
+        return dirs[0]
+    
 def ang_to_str(angle):
     string = str(abs(angle)).zfill(2)    
     if angle < 0:
@@ -120,7 +132,6 @@ def load_data_df(in_directory):
     #load dataframe df from .npz file
     loaded = np.load(in_directory, allow_pickle= True)
     df = pd.DataFrame(loaded['data'], columns=loaded['columns'])
-
     #convert 'embedding' back to numpy array
     df['embedding'] = df['embedding'].apply(lambda x: np.array(x))
     return df   
