@@ -182,6 +182,37 @@ def check(array_cleaned, array_test, what, all_centroids, angles = None, all = T
         embedding_cent = all_centroids[result1]
         results = result1 - results2
 
+        print(results2.tolist())
+        all_centroids = np.array(all_centroids)
+        #rotate embedding one
+        mask_no_rot = results != 0
+        mask_no_rot = mask_no_rot.reshape(1, len(mask_no_rot))
+        embedding2_cents = all_centroids[results2]
+        vectors_rot_one = mask_no_rot*(embedding_cent-embedding2_cents)
+        emb2_rot_one = embeddings2 + vectors_rot_one
+
+        #rotate embedding both
+        target_idx = 5
+        mask_target_rot1 = result1 != target_idx
+        mask_target_rot2 = results2 != target_idx
+        #maska 1 ali 0
+        emb1_rot_both = embedding+mask_target_rot1*all_centroids[target_idx]
+        vectors_rot_both = mask_target_rot2*all_centroids[target_idx]
+        emb2_rot_both = embeddings2 + vectors_rot_both
+
+        #calculate average weight
+        vectors1_avg = np.delete(all_centroids, result1)-all_centroids[result1]
+        embs1_avg = np.concatenate((embedding, embedding + vectors1_avg), axis = 0)
+        emb1_avg = (weights*embs1_avg)/np.sum(weights)
+
+        vectors2_avg = np.delete(all_centroids, results2)-all_centroids[results2]
+        embs2_avg = np.concatenate((embedding, embedding + vectors2_avg), axis = 0)
+        emb2_avg = (weights*embs2_avg)/np.sum(weights)        
+
+
+
+
+
         for j in range(length):
             embedding2 = embeddings2[j]
             num = 0

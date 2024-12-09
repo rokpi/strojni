@@ -3,11 +3,11 @@ import numpy as np
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.getcwd(), 'strojni')))
 from tqdm import tqdm
-from utils.utils_new import create_directory, load_data_df, cosine_similarity,ang_to_str
+from my_utils.utils_new import create_directory, load_data_df, cosine_similarity,ang_to_str
 from datetime import datetime
 from base.apply_vector import init_decoder
-from utils.utils_test import find_matrix, tranform_to_img, read_txt
-from utils.utils_pca import get_pca_vectors, define_true_vector
+from my_utils.utils_test import find_matrix, tranform_to_img, read_txt
+from my_utils.utils_pca import get_pca_vectors, define_true_vector
 
 def main():
     vec_directory = '/home/rokp/test/centroid/20240911_121715'
@@ -198,13 +198,46 @@ def rename_files(source_dir):
             file = os.path.join(file_path, filename)
             os.remove(file)
         
+def remove_files_one(source_dir):
+    files = glob.glob(os.path.join(source_dir, "*.jpg"))
+    files.sort()
+    dictionary = {}
+    iden = 1
+    num = 1
+    for file_path in tqdm(files, total = len(files)):
+        basename = os.path.basename(file_path)
+        split = basename.split('_')
+        if len(split) > 2:
+            new_filename = split[0] + split[1]
+        elif len(split) == 2:
+            new_filename = split[0]
+        else: 
+            new_filename = basename.split('.')[0]
 
+        if new_filename in dictionary:
+            person = dictionary[new_filename][0]
+            num = dictionary[new_filename][1] + 1
+            dictionary[new_filename] = (person, num, file_path)
+        else:
+            person = iden
+            num = 1
+            dictionary[new_filename] = (person, num, file_path)
+            iden += 1
+
+    for key, value in dictionary.items() :
+        print(value[1])
+        if value[1] == 1:
+            #file_path = os.path.dirname(value[2])
+            filename = f"{value[0]}_1.jpg"
+            print(filename)
+            #file = os.path.join(file_path, filename)
+            #os.remove(file)
   
 if __name__ == '__main__':
 
     # Uporaba funkcije
     txt = "/home/rokp/test/pairs_CPLFW.txt"
-    source_dir = "/home/rokp/test/images/images_cplfw copy"
+    source_dir = "/home/rokp/test/images/images_mtcnn_cplfw"
     main_directory = "/home/rokp/test/images_lfw"  # Zamenjaj s potjo do svoje mape
     #delete_files_in_txt(txt, source_dir)
-    rename_files(source_dir)
+    remove_files_one(source_dir)

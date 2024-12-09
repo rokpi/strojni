@@ -7,9 +7,6 @@ from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 import sys
 
-sys.path.append('/home/rokp/test/models/SwinFace/swinface_project')
-from model import build_model
-
 # Razred za dataset
 class ImageDataset(Dataset):
     def __init__(self, df):
@@ -23,7 +20,7 @@ class ImageDataset(Dataset):
         return {
             'person': row['person'],   # Podatek o osebi
             'img_dir': row['img_dir'], # Pot do slike
-            'angle': row['angle'],      # Kot obraza
+            #'angle': row['angle'],      # Kot obraza
             'img': self.transform(row['img_dir'])
         }
     
@@ -39,6 +36,8 @@ class ImageDataset(Dataset):
     
 #@torch.no_grad()
 def process_and_save_embeddings(df, output_dir):
+    sys.path.append('/home/rokp/test/models/SwinFace/swinface_project')
+    from model import build_model
     cfg = SwinFaceCfg()
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -65,7 +64,7 @@ def process_and_save_embeddings(df, output_dir):
                 results.append({
                     'person': batch['person'][i],               # Ostane string
                     'img_dir': batch['img_dir'][i],              # Ostane string
-                    'angle': batch['angle'][i].item(),           # Pretvori tensor v int
+                    #'angle': batch['angle'][i].item(),           # Pretvori tensor v int
                     'embedding': model(images[i])['Recognition'][0].cpu().numpy().tolist()         # Pretvori v seznam
                 })
 

@@ -1,11 +1,11 @@
 import os
 import numpy as np
 from tqdm import tqdm
-from utils_new import create_directory, load_data_df, cosine_similarity, get_all_angles
+from my_utils.utils_new import create_directory, load_data_df, cosine_similarity, get_all_angles,ang_to_str
 from datetime import datetime
-from apply_vector import init_decoder
-from utils_test import ang_to_str, find_matrix, tranform_to_img, read_txt
-from utils_pca import get_pca_vectors, define_true_vector, kabsch
+from base.apply_vector import init_decoder
+from my_utils.utils_test import find_matrix, tranform_to_img, read_txt
+from my_utils.utils_pca import get_pca_vectors, define_true_vector, kabsch
 
 def get_and_test_vector(df_person, df_person_angle, angles):
     df_vec_neut = df_person[df_person['angle']==angles[0]].copy(deep=True)
@@ -36,10 +36,10 @@ def get_and_test_vector(df_person, df_person_angle, angles):
 
 def main():
     vec_directory = '/home/rokp/test/bulk/20241118_083956_vec_vgg_vse'
-    out_dir = '/home/rokp/test/test/test'
-    in_directory = '/home/rokp/test/test/dataset/mtcnn/vgg-vgg/20241111_124312_vgg/vgg-vggmtcnn_images_mtcnn.npz'
+    out_dir = '/home/rokp/test/test'
+    in_directory = '/home/rokp/test/dataset/mtcnn/vgg-vgg/20241111_124312_vgg/vgg-vggmtcnn_images_mtcnn.npz'
     txt_dir = '/home/rokp/test/launch_test_arcface.txt'
-    txt_dir_train = '/home/rokp/test/launch_train_arcface.txt'
+    txt_dir_train = '/home/rokp/test/strojni/launch/launch_train_arcface.txt'
     model_path = '/home/rokp/test/models/mtcnn/vgg-vgg/vgg-vgg.mtcnn.conv4_3.20230124-204737.hdf5'
     start = -90
     end = 90
@@ -49,7 +49,7 @@ def main():
 
     save = True
     limit_space = True
-    segment = True
+    segment = False
     indexes = [i for i in range(512)]
     people = ['001']#, '028', '042', '049', '086', '133']#read_txt(txt_dir)
 
@@ -70,11 +70,13 @@ def main():
     tranform_to_img(df, np.zeros([1,4096]),0, 'centroid', encoder_type, decoder_model, model_path, out, 0, save=save)'''
 
     #eigenvectors, eigenvalues, grouped = get_pca_vectors(df, people_train)
-    '''np.save(os.path.join(out_dir, 'eigenvectors.npy'), eigenvectors)
-    np.save(os.path.join(out_dir, 'eigenvalues.npy'), eigenvalues)'''
+    #np.save(os.path.join(out_dir, 'eigenvectors.npy'), eigenvectors)
+    #np.save(os.path.join(out_dir, 'eigenvalues.npy'), eigenvalues)
 
-    eigenvectors = np.load('/home/rokp/test/test/test/eigenvectors.npy')
-    eigenvalues = np.load('/home/rokp/test/test/test/eigenvalues.npy')
+    eigenvectors = np.load('/home/rokp/test/test/values/eigenvectors.npy')
+    eigenvalues = np.load('/home/rokp/test/test/values/eigenvalues.npy')
+    num_vectors = 100
+    base_vectors = eigenvectors[:,:num_vectors]
 
     if not segment: 
         df= df[df['angle'] == start]
@@ -90,13 +92,19 @@ def main():
         num = 0
         for i in tqdm(range(len(angles)-1), total = len(angles)-1):
             if segment:
-                df_person_angle = df_person[df_person['angle'] == angles[i]].copy(deep = True)
+                df_person_angle = df_person[df_person['angle'] == angles[i]].copy(deep = True)            
 
-            
             matrix_dir  = find_matrix(angles[i], angles[i+1], vec_directory)
             vector = np.load(matrix_dir)
+
+            VtV_inv = np.linalg.inv(base_vectors.T @ base_vectors)  # Inverz matrike
+            p_proj = base_vectors @ (VtV_inv @ (base_vectors.T @ vector))
+            vector_new = p_proj
+            #base = eigenvectors[]
+
             #vector_new = vector/np.linalg.norm(vector)
-            coeficients = np.dot(eigenvectors.T, vector)
+
+            '''coeficients = np.dot(eigenvectors.T, vector)
             
             #realizira gede na omejeno območje
             maska = np.abs(maxmul) < np.abs(coeficients)
@@ -104,7 +112,7 @@ def main():
             if limit_space:
                 coeficients[maska] = np.sign(coeficients[maska]) * np.abs(maxmul[maska])
             
-            vector_new = np.dot(eigenvectors, coeficients)
+            vector_new = np.dot(eigenvectors, coeficients)'''
 
             for j in range(1, divide+1):
                 #multiply *= 10**(2/divide)

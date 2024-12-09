@@ -1,5 +1,5 @@
 import os
-from my_utils.utils_new import rotational_to_cartesian
+from my_utils.utils_new import rotational_to_cartesian, ang_to_str
 from my_utils.utils_exceptions import define_tranform
 from my_utils.utils import restore_original_image_from_array
 from tensorflow.keras.preprocessing.image import save_img

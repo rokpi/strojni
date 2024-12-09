@@ -9,7 +9,7 @@ import pandas as pd
 
 def argparser():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--inputs', default=r'/home/rokp/test/dataset/adaface/ada.npz', type=str, help='Path to the embeddings')
+    parser.add_argument('--inputs', default=r'/home/rokp/test/test/test_ada.npz', type=str, help='Path to the embeddings')
     parser.add_argument('--out_dir', default=r'/home/rokp/test/bulk', type=str, help='Output directory where the embeddings will be saved.')
     args = parser.parse_args()
     return args

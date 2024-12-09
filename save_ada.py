@@ -2,6 +2,7 @@ import torch
 import os
 import numpy as np
 
+import math
 from PIL import Image
 from torchvision import transforms
 from torch.utils.data import Dataset, DataLoader
@@ -13,15 +14,14 @@ import pandas as pd
 import glob
 from datetime import datetime
 import sys
-sys.path.append('/home/rokp/test/models/AdaFace')
-from face_alignment import align
-import net
 adaface_models = {
     'ir_101':"/home/rokp/test/models/AdaFace/pretrained/adaface_ir101_webface12m.ckpt",
 }
 
     
 def load_pretrained_model(architecture='ir_101'):
+    sys.path.append('/home/rokp/test/models/AdaFace')
+    import net
     # load model and pretrained statedict
     assert architecture in adaface_models.keys()
     model = net.build_model(architecture)
@@ -56,7 +56,7 @@ class ImageDataset(Dataset):
         return {
             'person': row['person'],   # Podatek o osebi
             'img_dir': row['img_dir'], # Pot do slike
-            'angle': row['angle'],      # Kot obraza
+            #'angle': row['angle'],      # Kot obraza
             'tensor': row['tensor']
 
         }
@@ -70,7 +70,11 @@ def log_missing_faces(filepath, datetime):
     with open(log_file_path, "a") as log_file:
         log_file.write(f"{filepath}\n")
 
-def preprocess_img(df, output_dir, datetime):
+def preprocess_img(df, output_dir, chunk_size = 10000):
+    sys.path.append('/home/rokp/test/models/AdaFace')
+    from face_alignment import align
+    current_date = datetime.now().strftime("%Y%m%d_%H%M%S") 
+    os.mkdir(f'/home/rokp/test/chunk/{current_date}')
     dataset = ImageDataset(df)
     dataloader = DataLoader(dataset, batch_size=1, num_workers=6, shuffle=False)
 
@@ -81,7 +85,6 @@ def preprocess_img(df, output_dir, datetime):
         device = 'cpu'
         print("Procesirannje bo poteklo na CPU.")
     
-    device = 'cpu'
 
     results = []
     with torch.no_grad():
@@ -93,25 +96,25 @@ def preprocess_img(df, output_dir, datetime):
                 results.append({
                     'person': batch['person'][0],   # Ostane string
                     'img_dir': img_dir,            # Ostane string
-                    'angle': batch['angle'][0],    # Pretvori tensor v int
+                    #'angle': batch['angle'][0],    # Pretvori tensor v int
                     'tensor': bgr_tensor_input.cpu().numpy()
                 })
             else:
-                log_missing_faces(img_dir, datetime)
+                log_missing_faces(img_dir, current_date)
                 continue
-
-
     results_df = pd.DataFrame(results)
+    filtered_results_df = results_df.groupby('person').filter(lambda x: len(x) >= 2)
 
     # Shrani v .npz format
     file_path = output_dir
-    results_df.to_pickle(file_path)
-    '''np.savez(
-        file_path,
-        data=results_df,        # Shranite podatke kot NumPy array
-        columns=results_df.columns.to_list()  # Shranite imena stolpcev
-    )'''
+
+    for start in range(0, len(filtered_results_df), chunk_size):
+        chunk = filtered_results_df.iloc[start:start + chunk_size]
+        chunk.to_pickle(f'/home/rokp/test/chunk/{current_date}/chunk_{start // chunk_size}.pkl')
+    print("Datoteka je razdeljena na manjše dele.")
     print(f"Embeddingi in podatki shranjeni v {file_path}")
+
+
 def divide_pickle():
     df = pd.read_pickle('/home/rokp/test/test/20241202_095535')
     chunk_size = 10000
@@ -121,14 +124,14 @@ def divide_pickle():
     print("Datoteka je razdeljena na manjše dele.")
 
 
-def process_and_save_embeddings(model, output_dir):
+def process_and_save_embeddings(model, in_directory, output_dir):
     os.makedirs(os.path.dirname(output_dir), exist_ok=True)
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     model.to(device)
 
     results = []
-    chunk_files = sorted(glob.glob('/home/rokp/test/chunk/ada/chunk_*.pkl'))
+    chunk_files = sorted(glob.glob(f'{in_directory}/chunk_*.pkl'))
 
     for chunk_file in chunk_files:
         chunk_df = pd.read_pickle(chunk_file)  # Naloži en kos
@@ -146,7 +149,7 @@ def process_and_save_embeddings(model, output_dir):
                     results.append({
                         'person': batch['person'][i],               # Ostane string
                         'img_dir': batch['img_dir'][i],              # Ostane string
-                        'angle': batch['angle'][i].item(),           # Pretvori tensor v int
+                        #'angle': batch['angle'][i].item(),           # Pretvori tensor v int
                         'embedding': embeddings[i].tolist()         # Pretvori v seznam
                     })
 
@@ -166,26 +169,9 @@ def process_and_save_embeddings(model, output_dir):
 if __name__ == '__main__':
     current_date = datetime.now().strftime("%Y%m%d_%H%M%S") 
     out_dir = os.path.join('/home/rokp/test/test', 'test_ada.npz')
+    in_directory = '/home/rokp/test/chunk/ada_cplfw'
     model = load_pretrained_model('ir_101')
     feature, norm = model(torch.randn(2,3,112,112))
-    process_and_save_embeddings(model, out_dir)
-    '''model = load_pretrained_model('ir_101')
-    feature, norm = model(torch.randn(2,3,112,112))
-    current_date = datetime.now().strftime("%Y%m%d_%H%M%S")
-    test_image_path = '/home/rokp/test/images_raw_jpg'
-    features = []
-    for fname in tqdm(sorted(os.listdir(test_image_path)), total = len(os.listdir(test_image_path))):
-        path = os.path.join(test_image_path, fname)
-        aligned_rgb_img = align.get_aligned_face(path)
-
-        if aligned_rgb_img:
-            bgr_tensor_input = to_input(aligned_rgb_img)
-            feature, _ = model(bgr_tensor_input)
-            features.append(feature)
-        else:
-            log_missing_faces(path, current_date)
-
-    similarity_scores = torch.cat(features) @ torch.cat(features).T
-    print(similarity_scores)'''
+    process_and_save_embeddings(model,in_directory, out_dir)
     
 
