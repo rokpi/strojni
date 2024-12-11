@@ -81,8 +81,6 @@ def save_graphs(similarity1, difference1, out_directory):
   #plt.ylim([0.0, 1000.0])
   plt.savefig(f"{out_directory}/dist_all.jpg", format="jpg")
 
-  return overlap_area
-
 class EmbeddingDataset(Dataset):
     def __init__(self, df):
         self.df = df
@@ -126,10 +124,11 @@ def check_torch(array_cleaned, array_test, what, all_centroids, angles = None, a
   list_rot_both = []
   list_avg_one = []
   list_avg_both = []
+  difference = []
   num_random = math.ceil(len(array_copy) / len(array_test))
   df_test = pd.DataFrame(array_test)
   dataset = EmbeddingDataset(df_test)
-  dataloader = DataLoader(dataset, batch_size=128, num_workers=6, shuffle=False)
+  dataloader = DataLoader(dataset, batch_size=256, num_workers=6, shuffle=False)
   all_centroids_torch = torch.tensor(all_centroids, device = device, dtype=torch.float32)
   all_centroids_cpu = torch.tensor(all_centroids, dtype=torch.float32)
   weights = torch.tensor(np.array(weights), device = device, dtype=torch.float32)
@@ -137,7 +136,7 @@ def check_torch(array_cleaned, array_test, what, all_centroids, angles = None, a
   with torch.no_grad():
       for batch in tqdm(dataloader, desc="Processing batches", unit="batch"):
         person = batch['person']
-        all_embedding = batch['embedding']
+        all_embedding = batch['embedding'].to(device)
 
         for i in range(len(person)):
           if what == 'dif':
@@ -145,32 +144,32 @@ def check_torch(array_cleaned, array_test, what, all_centroids, angles = None, a
           else: 
             test_group = (array_copy[array_copy[:, person_num] == person[i]])
           test_group_embeddings = [torch.tensor(embedding) for embedding in test_group[:, embedding_num]]
-          embeddings2 = torch.vstack(test_group_embeddings)
+          embeddings2 = torch.vstack(test_group_embeddings).to(device)
 
           #if angles:
             #angle = batch['angle']
             #angles2 = test_group[:, angle_num]
 
           # Compute distances for the test embedding
-          vectors1 = all_embedding[i] - all_centroids_cpu
+          vectors1 = all_embedding[i] - all_centroids_torch
           distances1 = torch.norm(vectors1, dim=1)
           result1 = int(torch.argmin(distances1).item())
 
           # Compute distances for all test group embeddings
-          vectors2 = embeddings2[:, None, :] - all_centroids_cpu
+          vectors2 = embeddings2[:, None, :] - all_centroids_torch
           distances2 = torch.norm(vectors2, dim=2)
           results2 = torch.argmin(distances2, dim=1)
 
-          embedding_cent = all_centroids_torch[result1][None,:].clone().detach().to(device).to(torch.float32)
+          embedding_cent = all_centroids_torch[result1][None,:]#.clone().detach().to(device).to(torch.float32)
           results = result1 - results2
 
-          embeddings2 = embeddings2.clone().detach().to(device).to(torch.float32)
-          embedding = all_embedding[i].clone().detach().to(device).to(torch.float32)
-          results2 = results2.clone().detach().to(device).to(torch.long)
+          #embeddings2 = embeddings2.clone().detach().to(device).to(torch.float32)
+          embedding = all_embedding[i]
+          #results2 = results2.clone().detach().to(device).to(torch.long)
           
           # Rotate embedding one
           base_no_rot = (results != 0).view(-1, 1)
-          mask_no_rot = base_no_rot.repeat(1, embedding.shape[1]).to(device)  # (length, 512)
+          mask_no_rot = base_no_rot.repeat(1, embedding.shape[1])#.to(device)  # (length, 512)
           embedding2_cents = all_centroids_torch[results2]
           vectors_rot_one = mask_no_rot * (embedding_cent - embedding2_cents)
           emb2_rot_one = embeddings2 + vectors_rot_one
@@ -209,33 +208,35 @@ def check_torch(array_cleaned, array_test, what, all_centroids, angles = None, a
           embs2_avg = torch.sum((weights_vec_exp * embs2_avg) / sum_avg, dim=1)
 
           #normal
-          sim_normal = compute_cosine_similarities_torch(embedding, embeddings2).reshape(len(results2))
+          sim_normal = compute_cosine_similarities_torch(embedding, embeddings2).reshape(len(results2), 1)
           #rotate one
-          sim_rot_one = compute_cosine_similarities_torch(embedding, emb2_rot_one).reshape(len(results2))    
+          sim_rot_one = compute_cosine_similarities_torch(embedding, emb2_rot_one).reshape(len(results2), 1)    
           #rotate both
-          sim_rot_both = compute_cosine_similarities_torch(emb1_rot_both, emb2_rot_both).reshape(len(results2))
+          sim_rot_both = compute_cosine_similarities_torch(emb1_rot_both, emb2_rot_both).reshape(len(results2), 1)
           #average one
-          sim_avg_one = compute_cosine_similarities_torch(embs1_avg, embeddings2).reshape(len(results2))
+          sim_avg_one = compute_cosine_similarities_torch(embs1_avg, embeddings2).reshape(len(results2), 1)
           #average both
-          sim_avg_both = compute_cosine_similarities_torch(embs1_avg, embs2_avg).reshape(len(results2))
+          sim_avg_both = compute_cosine_similarities_torch(embs1_avg, embs2_avg).reshape(len(results2), 1)
 
-          list_normal.append(sim_normal.cpu().numpy())
+          ##TORCH HSTACK
+          stack = torch.hstack([sim_normal, sim_rot_one, sim_rot_both, sim_avg_one, sim_avg_both])
+          difference.append(stack.cpu().numpy())
+          '''list_normal.append(sim_normal.cpu().numpy())
           list_rot_one.append(sim_rot_one.cpu().numpy())
           list_rot_both.append(sim_rot_both.cpu().numpy())
           list_avg_one.append(sim_avg_one.cpu().numpy())
-          list_avg_both.append(sim_avg_both.cpu().numpy())
+          list_avg_both.append(sim_avg_both.cpu().numpy())'''
           torch.cuda.empty_cache()
           del resulting_matrices
           del embedding
           del embeddings2
           del embedding_cent
           del embedding2_cents
-          del target_idx
           del mask_avg
           del mask
           del mask_no_rot
           del results2
-  return list_normal, list_rot_one, list_rot_both, list_avg_one, list_avg_both, wrong, right
+  return difference#list_normal, list_rot_one, list_rot_both, list_avg_one, list_avg_both, wrong, right
 
 
 def check(array_cleaned, array_test, what, all_centroids, angles = None, all = True):
@@ -374,8 +375,8 @@ def compute_cosine_similarities(embeddings1, embeddings2, epsilon=1e-8):
     return cosine_similarities.squeeze()
 
 def main():
-  df = load_data_df('/home/rokp/test/dataset/swinface/cplfw/swinface.npz')
-  centroid_directory = '/home/rokp/test/bulk/20241203_161327_cent_swinface_vse'
+  df = load_data_df('/home/rokp/test/dataset/adaface/cplfw/test_ada.npz')
+  centroid_directory = '/home/rokp/test/bulk/20241203_170307_cent_ada_vse'
   out_dir = '/home/rokp/test/ROC'
   total = 1
   loop = False
@@ -443,10 +444,13 @@ def main():
     dif_one_arr = np.array(df_cleaned.groupby(0).apply(lambda x: x.sample(1)).reset_index(drop=True).values)
     dif_cleaned = clean_df(df, dif_one_arr, angles= angles)
 
-    list_normal1, list_rot_one1, list_rot_both1, list_avg_one1, list_avg_both1, wrong1, right1 = check_torch(sim_cleaned, sim_one_arr, 'sim', all_centroids, angles= angles, all = b_check_all)#
-    list_normal, list_rot_one, list_rot_both, list_avg_one, list_avg_both, wrong2, right2 = check_torch(dif_cleaned, dif_one_arr,'dif', all_centroids, angles= angles, all=b_check_all)#
-   
-    diff_arr_normal = np.concatenate(list_normal).reshape(-1,1)
+    #list_normal1, list_rot_one1, list_rot_both1, list_avg_one1, list_avg_both1, wrong1, right1 = check_torch(sim_cleaned, sim_one_arr, 'sim', all_centroids, angles= angles, all = b_check_all)#
+    #list_normal, list_rot_one, list_rot_both, list_avg_one, list_avg_both, wrong2, right2 = check_torch(dif_cleaned, dif_one_arr,'dif', all_centroids, angles= angles, all=b_check_all)#
+    similarity = check_torch(sim_cleaned, sim_one_arr, 'sim', all_centroids, angles= angles, all = b_check_all)
+    array_sim = np.concatenate(similarity)
+    difference = check_torch(dif_cleaned, dif_one_arr,'dif', all_centroids, angles= angles, all=b_check_all)
+    array_diff = np.concatenate(difference)
+    '''diff_arr_normal = np.concatenate(list_normal).reshape(-1,1)
     diff_arr_rot_one = np.concatenate(list_rot_one).reshape(-1,1)
     diff_arr_rot_both = np.concatenate(list_rot_both).reshape(-1,1)
     diff_arr_avg_one = np.concatenate(list_avg_one).reshape(-1,1)
@@ -459,7 +463,7 @@ def main():
     sim_arr_avg_both = np.concatenate(list_avg_both1).reshape(-1,1)
 
     array_diff = np.hstack([diff_arr_normal, diff_arr_rot_one, diff_arr_rot_both, diff_arr_avg_one, diff_arr_avg_both])
-    array_sim = np.hstack([sim_arr_normal, sim_arr_rot_one, sim_arr_rot_both, sim_arr_avg_one, sim_arr_avg_both])
+    array_sim = np.hstack([sim_arr_normal, sim_arr_rot_one, sim_arr_rot_both, sim_arr_avg_one, sim_arr_avg_both])'''
     similarity_scores = np.concatenate((array_sim, array_diff), axis = 0)
     #similarity_scores = np.array(similarity1 + difference1)
     true_labels =np.concatenate((np.ones([1, len(array_sim)]), np.zeros([1, len(array_diff)])), axis = 1)
@@ -495,10 +499,10 @@ def main():
 
   final_df['Description'] = descriptions[:similarity_scores.shape[1]]
   final_df.to_excel(os.path.join(filepath,"data.xlsx"), index=False)
-  '''for i in range(similarity_scores.shape[1]):  
+  for i in range(similarity_scores.shape[1]):  
     directory = os.path.join(filepath, descriptions[i])
     os.makedirs(directory, exist_ok=True)
-    overlap_area = save_graphs(array_sim[:,i], array_diff[:,i], directory)'''
+    save_graphs(array_sim[:,i], array_diff[:,i], directory)
   print(f'Saved all in {filepath}')
 
 def process_table(data, table_name):
