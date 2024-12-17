@@ -49,10 +49,12 @@ def solve_eigenproblem(C):
     eigenvectors = eigenvectors[:, idx]
     return eigenvalues, eigenvectors
 
-def get_pca_vectors(df, people):
+def get_pca_vectors(df, people = None):
     #df from extract embedds
     df_copy = df.copy()
-    df_copy = df_copy[df_copy['person'].isin(people)]
+    if people is not None:
+        df_copy = df_copy[df_copy['person'].isin(people)]
+        
     grouped = calculate_tempCentre(df_copy)
     norm_embedds = centre_and_norm_embedds(df_copy, grouped)
 
@@ -60,15 +62,7 @@ def get_pca_vectors(df, people):
     norm_embedds = norm_embedds.reshape(-1, norm_embedds.shape[2])
     covarianceMatrix = 1/(N * (N-1) - 1) * np.dot(norm_embedds.T, norm_embedds)
     eigenvalues, eigenvectors = solve_eigenproblem(covarianceMatrix)
-
-    grouped = df_copy.groupby('person').apply(lambda group: pd.Series({
-        'tempCentre': np.mean(np.vstack(group['embedding']), axis=0).reshape(1, -1)
-    })).reset_index()
-
-    # Spremeni 'tempCentre' v podatkovni okvir
-    grouped['tempCentre'] = grouped['tempCentre'].apply(lambda x: x.flatten())  # Pretvori tempCentre v 1D vektor
-
-    return eigenvectors, eigenvalues, grouped
+    return eigenvectors, eigenvalues
 
 def define_true_vector(vector, pca_vector):
     vector = np.subtract(vector, np.dot(np.dot(vector.T, pca_vector), pca_vector))

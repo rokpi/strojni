@@ -1,5 +1,6 @@
 import numpy as np
-from my_utils.utils_new import find_centroid, load_data_df, cosine_similarity, create_directory, get_all_angles, ang_to_str
+from my_utils.utils_new import find_centroid, load_data_df, create_directory, get_all_angles, ang_to_str
+from my_utils.utils_pca import get_pca_vectors
 from tqdm import tqdm
 import pandas as pd
 import math
@@ -65,7 +66,7 @@ def save_graphs(similarity1, difference1, out_directory):
   # Shranimo graf kot .jpg datoteko
   plt.savefig(f"{out_directory}/ROC_skicit.jpg", format="jpg")
 
-  bins = np.linspace(-0.3, 1, 10000)
+  '''bins = np.linspace(-0.3, 1, 10000)
 
   hist1, _ = np.histogram(similarity1, bins=bins, density=True)
   hist2, _ = np.histogram(difference1, bins=bins, density=True)
@@ -79,7 +80,7 @@ def save_graphs(similarity1, difference1, out_directory):
   plt.ylabel("Frequency")
   plt.xlim([-0.3, 1])
   #plt.ylim([0.0, 1000.0])
-  plt.savefig(f"{out_directory}/dist_all.jpg", format="jpg")
+  plt.savefig(f"{out_directory}/dist_all.jpg", format="jpg")'''
 
 class EmbeddingDataset(Dataset):
     def __init__(self, df):
@@ -317,11 +318,15 @@ def check_torch_all(array_cleaned, array_test, all_centroids, angles = None):
   df_test['centroid'] = list(all_embeddings1_cent.cpu().numpy())
   del all_embeddings1_cent
 
-  all_vectors = []
+  eigenvectors = np.load('/home/rokp/test/bulk/20241217_133231/eigenvectors.npy')
+  #eigenvalues = np.load('/home/rokp/test/bulk/20241217_133231/eigenvalues.npy')
+
+  '''all_vectors = []
   for i in range(len(all_centroids_torch)-1):
     for j in range(len(all_centroids_torch[i+1:])):
       all_vectors.append(all_centroids_torch[i].unsqueeze(0)-all_centroids_torch[j].unsqueeze(0))
-  all_vectors = torch.vstack(all_vectors)
+  all_vectors = torch.vstack(all_vectors)'''
+  all_vectors = torch.tensor(eigenvectors[:2], device = device, dtype=torch.float32)
   P_mat_multiply =torch.vstack([torch.mm(all_vectors[i].unsqueeze(1), all_vectors[i].unsqueeze(1).T).unsqueeze(0) for i in range(len(all_vectors))])
   P_sum = torch.sum(P_mat_multiply, dim = 0)
   P = torch.eye(all_vectors.shape[1], dtype=torch.float32).to(device).to(device)-P_sum
@@ -548,6 +553,7 @@ def compute_cosine_similarities(embeddings1, embeddings2, epsilon=1e-8):
 
 def main():
   df = load_data_df('/home/rokp/test/dataset/arcface/cplfw/arcface.npz')
+
   centroid_directory = '/home/rokp/test/bulk/20241203_161446_cent_arcface_vse'
   out_dir = '/home/rokp/test/ROC'
   total = 5
