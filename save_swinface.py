@@ -20,7 +20,8 @@ class ImageDataset(Dataset):
         return {
             'person': row['person'],   # Podatek o osebi
             'img_dir': row['img_dir'], # Pot do slike
-            #'angle': row['angle'],      # Kot obraza
+            'angle': row['angle'],      # Kot obraza
+            'light': row['light'],      # Kot obraza
             'img': self.transform(row['img_dir'])
         }
     
@@ -64,13 +65,14 @@ def process_and_save_embeddings(df, output_dir):
                 results.append({
                     'person': batch['person'][i],               # Ostane string
                     'img_dir': batch['img_dir'][i],              # Ostane string
-                    #'angle': batch['angle'][i].item(),           # Pretvori tensor v int
+                    'angle': batch['angle'][i].item(),           # Pretvori tensor v int
+                    'light': batch['light'][i],  
                     'embedding': model(images[i])['Recognition'][0].cpu().numpy().tolist()         # Pretvori v seznam
                 })
 
     # Pretvori rezultate v DataFrame
     results_df = pd.DataFrame(results)
-
+    print(results_df)
     # Shrani v .npz format
     file_path = output_dir
     np.savez(

@@ -8,18 +8,11 @@ from my_utils.utils_pca import get_pca_vectors
 from datetime import datetime
 import pandas as pd
 
-def argparser():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--inputs', default=r'/home/rokp/test/dataset/adaface/vse/ada.npz', type=str, help='Path to the embeddings')
-    parser.add_argument('--out_dir', default=r'/home/rokp/test/bulk', type=str, help='Output directory where the embeddings will be saved.')
-    args = parser.parse_args()
-    return args
-
-def calculate_tempCentre(df):
+def calculate_tempCentre(df, what):
     #Keeps all the angles and img_dirs while grouping
     grouped = df.groupby('person').apply(lambda group: pd.Series({
         'tempCentre': np.mean(np.vstack(group['embedding']), axis=0).reshape(1, -1),
-        'angles': list(group['angle']),  
+        what: list(group[what]),  
         'img_dirs': list(group['img_dir']) 
     }))
     return grouped
@@ -33,9 +26,9 @@ def centre_embeddings(df, grouped):
     
     return df
 
-def calculate_centroids(df):
+def calculate_centroids(df, what):
     # Group by angle and calculate centroid
-    centroids_by_angle = df.groupby('angle')['centred_embedding'].apply(
+    centroids_by_angle = df.groupby(what)['centred_embedding'].apply(
         lambda embeddings: np.mean(np.vstack(embeddings), axis=0)
     )
     
@@ -44,10 +37,10 @@ def calculate_centroids(df):
     
     return centroids_df
 
-def centre_data_people(df):
-    grouped = calculate_tempCentre(df)
+def centre_data_people(df, what):
+    grouped = calculate_tempCentre(df, what)
     df = centre_embeddings(df, grouped)
-    centroids = calculate_centroids(df)
+    centroids = calculate_centroids(df,what)
     
     return  centroids
 
@@ -62,17 +55,28 @@ def save_centroids(centroids, fileDirectory, angles):
     print(f"Centroids saved in direction: {fileDirectory}")
     return fileDirectory
 
-def save_bulk(centroids, fileDirectory, angles):
-    for i, neut_cent in tqdm(enumerate(centroids['centred_embedding']), total = len(centroids)):
-        direction_vector = neut_cent
-        filename = f"Centroid_{ang_to_str(angles[i])}"
+def save_bulk(centroids, fileDirectory, what):
+    for index, item in tqdm(centroids.iterrows(), total = len(centroids)):
+        direction_vector = item['centred_embedding']
+        filename = f"Centroid_{ang_to_str(int(item[what]))}"
         subfile_path = os.path.join(fileDirectory, filename)
         np.save(subfile_path, direction_vector)
 
+def argparser():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--inputs', default=r'/home/rokp/test/dataset/arcface/svetloba/arcface.npz', type=str, help='Path to the embeddings')
+    parser.add_argument('--out_dir', default=r'/home/rokp/test/bulk', type=str, help='Output directory where the embeddings will be saved.')
+    parser.add_argument('--what', default='light', type=str, help='Which centroid to create.')
+    args = parser.parse_args()
+    return args
+
 def main(args):
-    
+    what = args.what
     in_directory = args.inputs
     df = load_data_df(in_directory)
+    #unique_values = df[what].unique()
+    #print(unique_values)
+
     current_date = datetime.now().strftime("%Y%m%d_%H%M%S")
     fileDirectory = os.path.join(args.out_dir, f"{current_date}")
     create_directory(fileDirectory)
@@ -80,15 +84,13 @@ def main(args):
     np.save(os.path.join(fileDirectory, 'eigenvectors.npy'), eigenvectors)
     np.save(os.path.join(fileDirectory, 'eigenvalues.npy'), eigenvalues)'''
     
-    unique_angles = df['angle'].unique().tolist()
-    unique_angles.sort()
     global_mean = np.mean(np.vstack(df['embedding']), axis=0).reshape(1, -1)
-
-    centroids = centre_data_people(df)
+    centroids = centre_data_people(df, what)
     centroids['centred_embedding'] = centroids['centred_embedding'].apply(lambda x: np.array(x))
+    #print(centroids)
 
     #save_centroids(centroids, fileDirectory, unique_angles)
-    save_bulk(centroids, fileDirectory, unique_angles)
+    save_bulk(centroids, fileDirectory, what)
     filename = "global"
     subfile_path = os.path.join(fileDirectory, filename)
     np.save(subfile_path, global_mean)

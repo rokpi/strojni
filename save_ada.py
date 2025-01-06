@@ -38,7 +38,7 @@ def to_input(pil_rgb_image):
     return tensor
 
 # Razred za dataset
-class ImageDataset(Dataset):
+class ImageDatasetPre(Dataset):
     def __init__(self, df):
         self.df = df
 
@@ -56,8 +56,9 @@ class ImageDataset(Dataset):
         return {
             'person': row['person'],   # Podatek o osebi
             'img_dir': row['img_dir'], # Pot do slike
-            #'angle': row['angle'],      # Kot obraza
-            'tensor': row['tensor']
+            'angle': row['angle'],      # Kot obraza
+            'light': row['light'],  
+            #'tensor': row['tensor']
 
         }
 
@@ -75,7 +76,7 @@ def preprocess_img(df, output_dir, chunk_size = 10000):
     from face_alignment import align
     current_date = datetime.now().strftime("%Y%m%d_%H%M%S") 
     os.mkdir(f'/home/rokp/test/chunk/{current_date}')
-    dataset = ImageDataset(df)
+    dataset = ImageDatasetPre(df)
     dataloader = DataLoader(dataset, batch_size=1, num_workers=6, shuffle=False)
 
     if torch.cuda.is_available():
@@ -96,7 +97,8 @@ def preprocess_img(df, output_dir, chunk_size = 10000):
                 results.append({
                     'person': batch['person'][0],   # Ostane string
                     'img_dir': img_dir,            # Ostane string
-                    #'angle': batch['angle'][0],    # Pretvori tensor v int
+                    'angle': batch['angle'][0],    # Pretvori tensor v int
+                    'angle': batch['light'][0],    # Pretvori tensor v int
                     'tensor': bgr_tensor_input.cpu().numpy()
                 })
             else:
@@ -114,7 +116,6 @@ def preprocess_img(df, output_dir, chunk_size = 10000):
     print("Datoteka je razdeljena na manjše dele.")
     print(f"Embeddingi in podatki shranjeni v {file_path}")
 
-
 def divide_pickle():
     df = pd.read_pickle('/home/rokp/test/test/20241202_095535')
     chunk_size = 10000
@@ -123,7 +124,30 @@ def divide_pickle():
         chunk.to_pickle(f'/home/rokp/test/chunk_2/chunk_{start // chunk_size}.pkl')
     print("Datoteka je razdeljena na manjše dele.")
 
+class ImageDataset(Dataset):
+    def __init__(self, df):
+        self.df = df
 
+    def __len__(self):
+        return len(self.df)
+
+    def __getitem__(self, idx):
+        row = self.df.iloc[idx]
+        try:
+            img_paths = row['img_dir']
+            imgs = Image.open(img_paths).convert('RGB')  # Odpri sliko in pretvori v RGB
+
+        except Exception as e:
+            raise RuntimeError(f"Error loading image at {img_paths}: {e}")
+        return {
+            'person': row['person'],   # Podatek o osebi
+            'img_dir': row['img_dir'], # Pot do slike
+            'angle': row['angle'],      # Kot obraza
+            'light': row['light'],  
+            'tensor': row['tensor']
+
+        }
+    
 def process_and_save_embeddings(model, in_directory, output_dir):
     os.makedirs(os.path.dirname(output_dir), exist_ok=True)
 
@@ -149,7 +173,8 @@ def process_and_save_embeddings(model, in_directory, output_dir):
                     results.append({
                         'person': batch['person'][i],               # Ostane string
                         'img_dir': batch['img_dir'][i],              # Ostane string
-                        #'angle': batch['angle'][i].item(),           # Pretvori tensor v int
+                        'angle': batch['angle'][i].item(),           # Pretvori tensor v int
+                        'light': batch['light'][i],  
                         'embedding': embeddings[i].tolist()         # Pretvori v seznam
                     })
 
@@ -168,7 +193,7 @@ def process_and_save_embeddings(model, in_directory, output_dir):
 
 if __name__ == '__main__':
     current_date = datetime.now().strftime("%Y%m%d_%H%M%S") 
-    out_dir = os.path.join('/home/rokp/test/test', 'test_ada.npz')
+    out_dir = os.path.join('/home/rokp/test/chunk', 'ada.npz')
     in_directory = '/home/rokp/test/chunk/ada_cplfw'
     model = load_pretrained_model('ir_101')
     feature, norm = model(torch.randn(2,3,112,112))

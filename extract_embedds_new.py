@@ -22,19 +22,19 @@ def make_directories(input_dir, extra = None):
     num_of_img = 0
     for img in input_dir:    
         filename = os.path.basename(img)
-        light = filename[15:16]
+        light = filename[14:16]
         #person_new = filename[0:3]  
         person_new = filename.split('_')[0]
         if person_new.isdigit():
-            #if check_img_requirements(filename):
+            if check_img_requirements(filename):
                 if extra:
                     filename = os.path.join(extra, filename)
                 if person_new not in seen_persons:
                     seen_persons.add(person_new)
-                    filtered_img_list.append({'person': person_new, 'img_dir': filename})#, 'angle': getAngle(img), 'light': light})#
+                    filtered_img_list.append({'person': person_new, 'img_dir': filename, 'angle': getAngle(img), 'light': light})#
                     num_of_img = num_of_img + 1
                 elif person_new in seen_persons:
-                    filtered_img_list.append({'person': person_new, 'img_dir': filename})#, 'angle': getAngle(img), 'light': light})#
+                    filtered_img_list.append({'person': person_new, 'img_dir': filename, 'angle': getAngle(img), 'light': light})#
                     num_of_img = num_of_img + 1
                         
         else:
@@ -44,7 +44,7 @@ def make_directories(input_dir, extra = None):
     return filtered_img_list
 
 def no_models():
-    in_directory = '/home/rokp/test/images/images_mtcnn_cplfw'
+    in_directory = '/home/rokp/test/images/images_mtcnn'
     out_dir = '/home/rokp/test/dataset'
     current_date = datetime.now().strftime("%Y%m%d_%H%M%S") 
     filename = f"{current_date}"
@@ -57,9 +57,9 @@ def no_models():
         filtered_img_list = make_directories(img_list, extra = in_directory)
         df = pd.DataFrame(filtered_img_list)
         output_dir = os.path.join('/home/rokp/test/test', current_date)
-        #ada.preprocess_img(df, output_dir)
+        ada.preprocess_img(df, output_dir)
         #swin.process_and_save_embeddings(df, out_directory)
-        arc.process_and_save_embeddings(df, out_directory)
+        #arc.process_and_save_embeddings(df, out_directory)
         print(f"File saved in {out_directory}")                            
     
 if __name__ == '__main__':

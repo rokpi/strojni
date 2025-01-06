@@ -12,8 +12,7 @@ from PIL import Image
 from tqdm import tqdm
 import sys
 
-sys.path.append('/home/rokp/test/models/arcface_torch')
-from backbones import get_model
+
 
 # Razred za dataset
 class ImageDataset(Dataset):
@@ -28,7 +27,8 @@ class ImageDataset(Dataset):
         return {
             'person': row['person'],   # Podatek o osebi
             'img_dir': row['img_dir'], # Pot do slike
-            #'angle': row['angle'],      # Kot obraza
+            'angle': row['angle'],      # Kot obraza
+            'light': row['light'],
             'img': self.transform(row['img_dir'])
         }
     
@@ -43,6 +43,8 @@ class ImageDataset(Dataset):
     
 
 def process_and_save_embeddings(df, output_dir):
+    sys.path.append('/home/rokp/test/models/arcface_torch')
+    from backbones import get_model
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     net = get_model('r100', fp16=False)
     net.load_state_dict(torch.load('/home/rokp/test/glint360k_cosface_r100_fp16_0.1/backbone.pth'))
@@ -62,7 +64,8 @@ def process_and_save_embeddings(df, output_dir):
                 results.append({
                     'person': batch['person'][i],               # Ostane string
                     'img_dir': batch['img_dir'][i],              # Ostane string
-                    #'angle': batch['angle'][i].item(),           # Pretvori tensor v int
+                    'angle': batch['angle'][i].item(), 
+                    'light': batch['light'][i],          
                     'embedding': net(images[i]).cpu().numpy().tolist()         # Pretvori v seznam
                 })
 
