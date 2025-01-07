@@ -5,7 +5,7 @@ sys.path.append(os.path.abspath(os.path.join(os.getcwd(), 'strojni')))
 from tqdm import tqdm
 from my_utils.utils_new import create_directory, load_data_df, cosine_similarity,ang_to_str
 from datetime import datetime
-from base.apply_vector import init_decoder
+from apply_vector import init_decoder
 from my_utils.utils_test import find_matrix, tranform_to_img, read_txt
 from my_utils.utils_pca import get_pca_vectors, define_true_vector
 
@@ -232,7 +232,28 @@ def remove_files_one(source_dir):
             print(filename)
             #file = os.path.join(file_path, filename)
             #os.remove(file)
-  
+
+import pandas as pd
+
+def fix_column_names_in_npz(file_path):
+    # Naloži obstoječo .npz datoteko
+    loaded = np.load(file_path, allow_pickle=True)
+    
+    # Rekonstruiraj DataFrame iz obstoječih podatkov
+    df = pd.DataFrame(loaded['data'])  # Ustvari DataFrame iz 'data'
+
+    # Nastavi pravilna imena stolpcev
+    correct_columns = ['person', 'img_dir', 'angle', 'light', 'embedding']
+    if len(df.columns) == len(correct_columns):
+        df.columns = correct_columns
+    else:
+        print(f"Število stolpcev ({len(df.columns)}) ne ustreza pričakovanemu ({len(correct_columns)}).")
+        return
+    
+    # Shrani nazaj v .npz z dodanimi imeni stolpcev
+    np.savez(file_path, data=df.values, columns=df.columns)
+    print("Stolpci uspešno popravljeni in dodani v datoteko!")
+
 if __name__ == '__main__':
 
     # Uporaba funkcije
@@ -240,4 +261,6 @@ if __name__ == '__main__':
     source_dir = "/home/rokp/test/images/images_mtcnn_cplfw"
     main_directory = "/home/rokp/test/images_lfw"  # Zamenjaj s potjo do svoje mape
     #delete_files_in_txt(txt, source_dir)
-    remove_files_one(source_dir)
+    #remove_files_one(source_dir)
+    fix_column_names_in_npz('/home/rokp/test/dataset/cosface/svetloba/arcface.npz')
+

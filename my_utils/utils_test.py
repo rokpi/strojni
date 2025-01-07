@@ -36,8 +36,6 @@ def tranform_to_img(df, vector, alpha, method, encoder_type, decoder_model, mode
         embedding = item['embedding']
         img_dir = item['img_dir']
 
-        if img_dir[14:16] not in ['08']:
-            continue
         alphavector = alpha * vector
         trans_embedd = embedding + alphavector
 

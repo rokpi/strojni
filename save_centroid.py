@@ -64,7 +64,7 @@ def save_bulk(centroids, fileDirectory, what):
 
 def argparser():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--inputs', default=r'/home/rokp/test/dataset/arcface/svetloba/arcface.npz', type=str, help='Path to the embeddings')
+    parser.add_argument('--inputs', default=r'/home/rokp/test/models/retinaface/resnet-vgg/resnet-vggmtcnn_images_mtcnn.npz', type=str, help='Path to the embeddings')
     parser.add_argument('--out_dir', default=r'/home/rokp/test/bulk', type=str, help='Output directory where the embeddings will be saved.')
     parser.add_argument('--what', default='light', type=str, help='Which centroid to create.')
     args = parser.parse_args()
@@ -78,7 +78,7 @@ def main(args):
     #print(unique_values)
 
     current_date = datetime.now().strftime("%Y%m%d_%H%M%S")
-    fileDirectory = os.path.join(args.out_dir, f"{current_date}")
+    fileDirectory = os.path.join(args.out_dir, f"{current_date}_{what}")
     create_directory(fileDirectory)
     '''eigenvectors, eigenvalues = get_pca_vectors(df)
     np.save(os.path.join(fileDirectory, 'eigenvectors.npy'), eigenvectors)

@@ -35,6 +35,10 @@ def get_all_filepaths(root_dir, ext):
 
 def get_all_angles():
     return [-90 , -85, -80, -30, -15, 0, 15, 30, 80, 85, 90]
+
+def get_all_lights():
+    return [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+
 def save_rot_npz(df, out_dir, in_directory):
     filename = Path(os.path.basename(in_directory))
     current_date = datetime.now().strftime("%Y%m%d_%H%M%S")

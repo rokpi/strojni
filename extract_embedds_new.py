@@ -31,10 +31,10 @@ def make_directories(input_dir, extra = None):
                     filename = os.path.join(extra, filename)
                 if person_new not in seen_persons:
                     seen_persons.add(person_new)
-                    filtered_img_list.append({'person': person_new, 'img_dir': filename, 'angle': getAngle(img), 'light': light})#
+                    filtered_img_list.append({'person': person_new, 'img_dir': filename, 'angle': getAngle(img), 'light': int(light)})#
                     num_of_img = num_of_img + 1
                 elif person_new in seen_persons:
-                    filtered_img_list.append({'person': person_new, 'img_dir': filename, 'angle': getAngle(img), 'light': light})#
+                    filtered_img_list.append({'person': person_new, 'img_dir': filename, 'angle': getAngle(img), 'light': int(light)})#
                     num_of_img = num_of_img + 1
                         
         else:

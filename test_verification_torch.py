@@ -1,5 +1,5 @@
 import numpy as np
-from my_utils.utils_new import find_centroid, load_data_df, create_directory, get_all_angles, ang_to_str
+from my_utils.utils_new import find_centroid, load_data_df, create_directory, get_all_angles,get_all_lights, ang_to_str
 from my_utils.utils_pca import get_pca_vectors
 from tqdm import tqdm
 import pandas as pd
@@ -264,10 +264,7 @@ def get_P(eigenvectors, num_vectors, embeddings2, device):
   del P_sum
   return P, P_embeddings2
 
-def check_torch_all(df, all_centroids, angles = None):
-  #weights = [10,8,6,4,0,2,0,4,6,8,10]
-  weights = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-
+def check_torch_all(df, weights, all_centroids, angles = None):
   if angles:
     person_num = 0
     embedding_num = 3
@@ -321,7 +318,7 @@ def check_torch_all(df, all_centroids, angles = None):
   df_copy['centroid'] = list(all_embeddings1_cent)
   del all_embeddings1_cent
 
-  eigenvectors = np.load('/home/rokp/test/bulk/20241217_133231/eigenvectors.npy')
+  eigenvectors = np.load('/home/rokp/test/bulk/20241217_133231_eig/eigenvectors.npy')
   #eigenvalues = np.load('/home/rokp/test/bulk/20241217_133231/eigenvalues.npy')
   P2, P_embeddings2_2 = get_P(eigenvectors, 2, embeddings2, device)
   P3, P_embeddings2_3 = get_P(eigenvectors, 3, embeddings2, device)
@@ -707,12 +704,14 @@ def calculate_roc(similarity, difference, out_dir, descriptions):
   print(f'Saved all in {out_dir}')
 
 def main():
-  df = load_data_df('/home/rokp/test/dataset/arcface/cplfw/arcface.npz')
+  df = load_data_df('/home/rokp/test/dataset/swinface/cplfw/swinface.npz')
 
-  centroid_directory = '/home/rokp/test/bulk/20241203_161446_cent_arcface_vse'
+  centroid_directory = '/home/rokp/test/bulk/20250107_134936_light_swinface'
   out_dir = '/home/rokp/test/ROC'
   total = 5
   loop = False
+  descriptions = ["Normal", "Rot One", "Rot Both", "Avg one", "Avg both", "P3"]#['2', '3', '4', '5', '10', '25'] #
+
   columns = df.shape[1]
   if columns == 4:
     print("Angles are")
@@ -722,22 +721,26 @@ def main():
     angles_are = False
   else:
     raise ValueError("Length of df is not typical")
-  
-  b_check_all = True
-  descriptions = ["Normal", "Rot One", "Rot Both", "Avg one", "Avg both", "P3"]#['2', '3', '4', '5', '10', '25'] #
 
-  if angles_are:
-    cent_angles = df['angle'].unique().tolist()
-    cent_angles.sort()
-    angles = cent_angles
-  else:
-    cent_angles = get_all_angles()#
+  cent_basename = os.path.basename(centroid_directory)
+  cent_type = cent_basename[16:21]
+  if cent_type == 'angle':
+    if angles_are:
+      cent_angles = df['angle'].unique().tolist()
+      cent_angles.sort()
+      angles = cent_angles
+    else:
+      cent_angles = get_all_angles()#
+      angles = None
+  elif cent_type == 'light':
+    cent_angles = get_all_lights()#
     angles = None
 
   all_centroids = []
   #selection = [-90,-85,-80,-30,0,30,80,85,90]
+  selection = [light for light in range(1,14)]#do 13
   for i in range(len(cent_angles)):
-      #if all_angles[i] in selection:
+      if cent_angles[i] in selection:
         centroid_str =  f"Centroid_{ang_to_str(cent_angles[i])}.npy"
         centroid_dir = find_centroid(centroid_str, centroid_directory)
         vector = np.load(centroid_dir)
@@ -754,6 +757,8 @@ def main():
 
   if not loop:
     total = 1
+  #weights = [10,8,6,4,0,2,0,4,6,8,10]
+  weights = np.ones(len(all_centroids))#[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 
   for i in range(total):
     print(f"{i}/{total}")
@@ -769,7 +774,7 @@ def main():
     #list_normal1, list_rot_one1, list_rot_both1, list_avg_one1, list_avg_both1, wrong1, right1 = check_torch(sim_cleaned, sim_one_arr, 'sim', all_centroids, angles= angles, all = b_check_all)#
     #list_normal, list_rot_one, list_rot_both, list_avg_one, list_avg_both, wrong2, right2 = check_torch(dif_cleaned, dif_one_arr,'dif', all_centroids, angles= angles, all=b_check_all)#
 
-    difference, similarity = check_torch_all(df, all_centroids, angles= angles)
+    difference, similarity = check_torch_all(df, weights, all_centroids, angles= angles)
     calculate_roc(similarity, difference, filepath, descriptions)
 
 if __name__ == '__main__':

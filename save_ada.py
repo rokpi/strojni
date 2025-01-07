@@ -77,7 +77,7 @@ def preprocess_img(df, output_dir, chunk_size = 10000):
     current_date = datetime.now().strftime("%Y%m%d_%H%M%S") 
     os.mkdir(f'/home/rokp/test/chunk/{current_date}')
     dataset = ImageDatasetPre(df)
-    dataloader = DataLoader(dataset, batch_size=1, num_workers=6, shuffle=False)
+    dataloader = DataLoader(dataset, batch_size=chunk_size, num_workers=1, shuffle=False)
 
     if torch.cuda.is_available():
         device = 'cuda'
@@ -85,29 +85,34 @@ def preprocess_img(df, output_dir, chunk_size = 10000):
     else:
         device = 'cpu'
         print("Procesirannje bo poteklo na CPU.")
-    
-
-    results = []
+    device = 'cpu'
+    num = 0
     with torch.no_grad():
         for batch in tqdm(dataloader, desc="Processing batches", unit="image"):
-            img_dir = batch['img_dir'][0]
-            aligned_rgb_img = align.get_aligned_face(img_dir)
-            if aligned_rgb_img:
-                bgr_tensor_input = to_input(aligned_rgb_img).to(device)
-                results.append({
-                    'person': batch['person'][0],   # Ostane string
-                    'img_dir': img_dir,            # Ostane string
-                    'angle': batch['angle'][0],    # Pretvori tensor v int
-                    'angle': batch['light'][0],    # Pretvori tensor v int
-                    'tensor': bgr_tensor_input.cpu().numpy()
-                })
-            else:
-                log_missing_faces(img_dir, current_date)
-                continue
-    results_df = pd.DataFrame(results)
-    filtered_results_df = results_df.groupby('person').filter(lambda x: len(x) >= 2)
+            num +=1
+            results = []
+            img_dir = batch['img_dir']
+            for i in tqdm(range(len(img_dir)), total = len(img_dir)):
+                aligned_rgb_img = align.get_aligned_face(img_dir[i])
+                if aligned_rgb_img:
+                    bgr_tensor_input = to_input(aligned_rgb_img).to(device)
+                    results.append({
+                        'person': batch['person'][i],   # Ostane string
+                        'img_dir': img_dir[i],            # Ostane string
+                        'angle': batch['angle'][i],    # Pretvori tensor v int
+                        'light': batch['light'][i],    # Pretvori tensor v int
+                        'tensor': bgr_tensor_input.cpu().numpy()
+                    })
+                else:
+                    log_missing_faces(img_dir[i], current_date)
+                    continue
+            
+            results_df = pd.DataFrame(results)
+            filtered_results_df = results_df.groupby('person').filter(lambda x: len(x) >= 2)
+            filtered_results_df.to_pickle(f'/home/rokp/test/chunk/{current_date}/chunk_{num}.pkl')
+            print(f"Shranjen chunk {num}")
 
-    # Shrani v .npz format
+    '''# Shrani v .npz format
     file_path = output_dir
 
     for start in range(0, len(filtered_results_df), chunk_size):
@@ -115,7 +120,7 @@ def preprocess_img(df, output_dir, chunk_size = 10000):
         chunk.to_pickle(f'/home/rokp/test/chunk/{current_date}/chunk_{start // chunk_size}.pkl')
     print("Datoteka je razdeljena na manjše dele.")
     print(f"Embeddingi in podatki shranjeni v {file_path}")
-
+'''
 def divide_pickle():
     df = pd.read_pickle('/home/rokp/test/test/20241202_095535')
     chunk_size = 10000
@@ -194,7 +199,7 @@ def process_and_save_embeddings(model, in_directory, output_dir):
 if __name__ == '__main__':
     current_date = datetime.now().strftime("%Y%m%d_%H%M%S") 
     out_dir = os.path.join('/home/rokp/test/chunk', 'ada.npz')
-    in_directory = '/home/rokp/test/chunk/ada_cplfw'
+    in_directory = '/home/rokp/test/chunk/ada_svet'
     model = load_pretrained_model('ir_101')
     feature, norm = model(torch.randn(2,3,112,112))
     process_and_save_embeddings(model,in_directory, out_dir)

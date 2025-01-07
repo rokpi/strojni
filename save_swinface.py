@@ -74,7 +74,7 @@ def process_and_save_embeddings(df, output_dir):
     results_df = pd.DataFrame(results)
     print(results_df)
     # Shrani v .npz format
-    file_path = output_dir
+    file_path = os.path.join(output_dir, 'swinface.npz')
     np.savez(
         file_path,
         data=results_df.to_numpy(),  # Shranite podatke kot NumPy array

@@ -1,10 +1,10 @@
 import os
 import numpy as np
 from tqdm import tqdm
-from my_utils.utils_new import create_directory, load_data_df, cosine_similarity, get_all_angles,ang_to_str
+from my_utils.utils_new import create_directory, load_data_df, cosine_similarity, get_all_angles,get_all_lights, ang_to_str,find_centroid
 from datetime import datetime
-from base.apply_vector import init_decoder
-from my_utils.utils_test import find_matrix, tranform_to_img, read_txt
+from apply_vector import init_decoder
+from my_utils.utils_test import tranform_to_img, read_txt
 from my_utils.utils_pca import get_pca_vectors, define_true_vector, kabsch
 
 def get_and_test_vector(df_person, df_person_angle, angles):
@@ -35,34 +35,64 @@ def get_and_test_vector(df_person, df_person_angle, angles):
     return vector_new
 
 def main():
-    vec_directory = '/home/rokp/test/bulk/20241118_083956_vec_vgg_vse'
+    centroid_directory = '/home/rokp/test/bulk/20250107_170152_light_retina_resnet_vgg'
     out_dir = '/home/rokp/test/test'
-    in_directory = '/home/rokp/test/dataset/mtcnn/vgg-vgg/20241111_124312_vgg/vgg-vggmtcnn_images_mtcnn.npz'
+    in_directory = '/home/rokp/test/dataset/retinaface/resnet-vgg/resnet-vggmtcnn_images_mtcnn.npz'
     txt_dir = '/home/rokp/test/launch_test_arcface.txt'
     txt_dir_train = '/home/rokp/test/strojni/launch/launch_train_arcface.txt'
-    model_path = '/home/rokp/test/models/mtcnn/vgg-vgg/vgg-vgg.mtcnn.conv4_3.20230124-204737.hdf5'
-    start = -90
-    end = 90
+    model_path = '/home/rokp/test/models/retinaface/resnet-vgg/resnet-vgg.mtcnn.retinaface.conv4_3.20230211-214207.03.hdf5'
+    start_idx = 0#-90
+    end_idx = 10#90
     alpha = 1
     lim__maxmul = 100
-    divide = 4
+    divide = 1
 
     save = True
     limit_space = True
-    segment = False
-    indexes = [i for i in range(512)]
+    segment = True
     people = ['001']#, '028', '042', '049', '086', '133']#read_txt(txt_dir)
 
-    all_angles = get_all_angles()
-    angles = [ang for ang in all_angles if ang >= start and ang <= end]
+    cent_basename = os.path.basename(centroid_directory)
+    cent_type = cent_basename[16:21]
+    if cent_type == 'angle':
+        cent_all = get_all_angles()
+        exclude = 'light'
+        exclude_focus = 8
+    elif cent_type == 'light':
+        cent_all = get_all_lights()
+        exclude = 'angle'
+        exclude_focus = 0
+
+
+    if end_idx + 1 > len(cent_all):
+        raise ValueError(f"Too many. Demanded end idx: {end_idx}\n Length of cent_all: {len(cent_all)}")
+    elif end_idx+1 == len(cent_all):
+        print('Vse...')
+    else:
+        cent_all = cent_all[start_idx:end_idx+1]
+
+    all_centroids = []
+    for i in range(len(cent_all)):
+        #if all_angles[i] in selection:
+            centroid_str =  f"Centroid_{ang_to_str(cent_all[i])}.npy"
+            centroid_dir = find_centroid(centroid_str, centroid_directory)
+            vector = np.load(centroid_dir)
+            #vector = apply_base(vector, base_vectors, VtV_inv)
+            #vector /=np.linalg.norm(vector)
+            all_centroids.append(vector)
+
+    df = load_data_df(in_directory)
+    global_mean = np.load(find_centroid("global.npy", centroid_directory)) 
+    #global_mean = np.mean(np.vstack(df['embedding']), axis=0).reshape(1, -1)
+    df['embedding'] = df['embedding'].apply(lambda x: x - global_mean)
+    df = df[df[exclude] == exclude_focus]
+
     current_date = datetime.now().strftime("%Y%m%d_%H%M%S")    
-    dirname = f"{current_date}_{ang_to_str(start)}_to_{ang_to_str(end)}"
+    dirname = f"{current_date}_{cent_type}_{ang_to_str(cent_all[start_idx])}_to_{ang_to_str(cent_all[end_idx])}"
     out = os.path.join(out_dir, dirname)
     create_directory(out)
 
     people_train = read_txt(txt_dir_train)
-
-    df = load_data_df(in_directory)
 
     decoder_model, encoder_type = init_decoder(model_path)
 
@@ -73,33 +103,35 @@ def main():
     #np.save(os.path.join(out_dir, 'eigenvectors.npy'), eigenvectors)
     #np.save(os.path.join(out_dir, 'eigenvalues.npy'), eigenvalues)
 
-    eigenvectors = np.load('/home/rokp/test/test/values/eigenvectors.npy')
-    eigenvalues = np.load('/home/rokp/test/test/values/eigenvalues.npy')
-    num_vectors = 100
-    base_vectors = eigenvectors[:,:num_vectors]
+    #eigenvectors = np.load('/home/rokp/test/test/values/eigenvectors.npy')
+    #eigenvalues = np.load('/home/rokp/test/test/values/eigenvalues.npy')
+    #num_vectors = 100
+    #base_vectors = eigenvectors[:,:num_vectors]
 
     if not segment: 
-        df= df[df['angle'] == start]
-
-    maxmul = eigenvalues*lim__maxmul#(eigenvalues/eigenvalues[0])*lim__maxmul
+        df= df[df[cent_type] ==cent_all[start_idx]]
+    
+    print(df)
+    #maxmul = eigenvalues*lim__maxmul#(eigenvalues/eigenvalues[0])*lim__maxmul
     multiply = alpha/divide
     #multiply = 10**(-2)
 
     for person in people:
         out_directory = create_directory(os.path.join(out, person))
         df_person = df[df['person'] == person]
-        vector = np.zeros_like(eigenvectors[0]) 
+        print(df_person)
+        #vector = np.zeros_like(eigenvectors[0]) 
         num = 0
-        for i in tqdm(range(len(angles)-1), total = len(angles)-1):
+        for i in tqdm(range(len(cent_all)-1), total = len(cent_all)-1):
             if segment:
-                df_person_angle = df_person[df_person['angle'] == angles[i]].copy(deep = True)            
+                df_person_focus = df_person[df_person[cent_type] == cent_all[i]].copy(deep = True)            
 
-            matrix_dir  = find_matrix(angles[i], angles[i+1], vec_directory)
-            vector = np.load(matrix_dir)
+            vector_new = all_centroids[i]-all_centroids[i+1]
+            vector_new=0
 
-            VtV_inv = np.linalg.inv(base_vectors.T @ base_vectors)  # Inverz matrike
+            '''VtV_inv = np.linalg.inv(base_vectors.T @ base_vectors)  # Inverz matrike
             p_proj = base_vectors @ (VtV_inv @ (base_vectors.T @ vector))
-            vector_new = p_proj
+            vector_new = p_proj'''
             #base = eigenvectors[]
 
             #vector_new = vector/np.linalg.norm(vector)
@@ -118,7 +150,7 @@ def main():
                 #multiply *= 10**(2/divide)
                 num+=1
                 if segment:
-                    df_person_angle = tranform_to_img(df_person_angle, vector_new, multiply, 'centroid', encoder_type, decoder_model, model_path, out_directory, num, save=save)
+                    df_person_focus = tranform_to_img(df_person_focus, vector_new, multiply, 'centroid', encoder_type, decoder_model, model_path, out_directory, num, save=save)
                 else:
                     df_person = tranform_to_img(df_person, vector_new, multiply, 'centroid', encoder_type, decoder_model, model_path, out_directory, num, save=save)
                     
