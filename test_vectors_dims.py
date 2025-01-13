@@ -1,11 +1,10 @@
 import os
 import numpy as np
 from tqdm import tqdm
-from my_utils.utils_new import create_directory, load_data_df, cosine_similarity, get_all_angles,get_all_lights, ang_to_str,find_centroid
+from my_utils.utils_new import create_directory, load_data_df, get_all_angles,get_all_lights, ang_to_str,find_centroid
 from datetime import datetime
-from apply_vector import init_decoder
+from apply_vector import init_decoder, restore
 from my_utils.utils_test import tranform_to_img, read_txt
-from my_utils.utils_pca import get_pca_vectors, define_true_vector, kabsch
 
 def get_and_test_vector(df_person, df_person_angle, angles):
     df_vec_neut = df_person[df_person['angle']==angles[0]].copy(deep=True)
@@ -34,13 +33,32 @@ def get_and_test_vector(df_person, df_person_angle, angles):
     vector_new /= np.linalg.norm(vector_new)
     return vector_new
 
+def get_P_np(eigenvectors, num_vectors):
+    # 1) Izberi le prvih 'num_vectors' vektorjev in jih pretvori v float32
+    all_vectors = eigenvectors[:num_vectors].astype(np.float32)
+
+    # 2) Ustvari 3D array, kjer vsako "ravnino" predstavlja zunanjih produkt vektorja z njim samim
+    #    (outer product). Nato jih vse zloži (stack) po dimenziji 0.
+    P_mat_multiply = np.stack([
+        np.outer(all_vectors[i], all_vectors[i])  # np.outer ustvari mat. produkt vektorja z vektorjem
+        for i in range(len(all_vectors))
+    ], axis=0)
+
+    # 3) Vsoto teh matrik seštej v eno samo matriko
+    P_sum = P_mat_multiply.sum(axis=0)
+
+    # 4) P = I - vsota rank-1 projekcij
+    P = np.eye(all_vectors.shape[1], dtype=np.float32) - P_sum
+
+    return P
+
 def main():
-    centroid_directory = '/home/rokp/test/bulk/20250107_170152_light_retina_resnet_vgg'
+    centroid_directory = '/home/rokp/test/bulk/20250113_111004_angle'
     out_dir = '/home/rokp/test/test'
-    in_directory = '/home/rokp/test/dataset/retinaface/resnet-vgg/resnet-vggmtcnn_images_mtcnn.npz'
+    in_directory = '/home/rokp/test/models/mtcnn/vgg-vgg/vgg-vggmtcnn_images_mtcnn.npz'
     txt_dir = '/home/rokp/test/launch_test_arcface.txt'
     txt_dir_train = '/home/rokp/test/strojni/launch/launch_train_arcface.txt'
-    model_path = '/home/rokp/test/models/retinaface/resnet-vgg/resnet-vgg.mtcnn.retinaface.conv4_3.20230211-214207.03.hdf5'
+    model_path = '/home/rokp/test/models/mtcnn/vgg-vgg/vgg-vgg.mtcnn.conv4_3.20230124-204737.hdf5'
     start_idx = 0#-90
     end_idx = 10#90
     alpha = 1
@@ -51,7 +69,6 @@ def main():
     limit_space = True
     segment = True
     people = ['001']#, '028', '042', '049', '086', '133']#read_txt(txt_dir)
-
     cent_basename = os.path.basename(centroid_directory)
     cent_type = cent_basename[16:21]
     if cent_type == 'angle':
@@ -70,7 +87,6 @@ def main():
         print('Vse...')
     else:
         cent_all = cent_all[start_idx:end_idx+1]
-
     all_centroids = []
     for i in range(len(cent_all)):
         #if all_angles[i] in selection:
@@ -82,11 +98,12 @@ def main():
             all_centroids.append(vector)
 
     df = load_data_df(in_directory)
-    global_mean = np.load(find_centroid("global.npy", centroid_directory)) 
-    #global_mean = np.mean(np.vstack(df['embedding']), axis=0).reshape(1, -1)
-    df['embedding'] = df['embedding'].apply(lambda x: x - global_mean)
-    df = df[df[exclude] == exclude_focus]
-
+    unique_values = df['light'].unique()
+    eigenvectors =np.load(find_centroid("eigenvectors.npy", centroid_directory))
+    global_mean = np.mean(np.vstack(df['embedding']), axis=0).reshape(1, -1)
+    #df['embedding'] = df['embedding'].apply(lambda x: x - global_mean)
+    #df = df[df[exclude] == exclude_focus]
+    P = get_P_np(eigenvectors, 3)
     current_date = datetime.now().strftime("%Y%m%d_%H%M%S")    
     dirname = f"{current_date}_{cent_type}_{ang_to_str(cent_all[start_idx])}_to_{ang_to_str(cent_all[end_idx])}"
     out = os.path.join(out_dir, dirname)
@@ -96,30 +113,17 @@ def main():
 
     decoder_model, encoder_type = init_decoder(model_path)
 
-    '''df = df[df['angle']==15]
-    tranform_to_img(df, np.zeros([1,4096]),0, 'centroid', encoder_type, decoder_model, model_path, out, 0, save=save)'''
-
-    #eigenvectors, eigenvalues, grouped = get_pca_vectors(df, people_train)
-    #np.save(os.path.join(out_dir, 'eigenvectors.npy'), eigenvectors)
-    #np.save(os.path.join(out_dir, 'eigenvalues.npy'), eigenvalues)
-
-    #eigenvectors = np.load('/home/rokp/test/test/values/eigenvectors.npy')
-    #eigenvalues = np.load('/home/rokp/test/test/values/eigenvalues.npy')
-    #num_vectors = 100
-    #base_vectors = eigenvectors[:,:num_vectors]
-
     if not segment: 
         df= df[df[cent_type] ==cent_all[start_idx]]
     
-    print(df)
+    unique_values = df['light'].unique()
     #maxmul = eigenvalues*lim__maxmul#(eigenvalues/eigenvalues[0])*lim__maxmul
     multiply = alpha/divide
     #multiply = 10**(-2)
-
+    cent_all = [0,15]
     for person in people:
         out_directory = create_directory(os.path.join(out, person))
         df_person = df[df['person'] == person]
-        print(df_person)
         #vector = np.zeros_like(eigenvectors[0]) 
         num = 0
         for i in tqdm(range(len(cent_all)-1), total = len(cent_all)-1):
@@ -145,14 +149,21 @@ def main():
                 coeficients[maska] = np.sign(coeficients[maska]) * np.abs(maxmul[maska])
             
             vector_new = np.dot(eigenvectors, coeficients)'''
+            if segment:
+                #embeddings = np.vstack(df_person_focus['embedding'])
+                #P_embeddings = np.dot(P, embeddings.T).T
+                #df_person_focus['embedding'] = list(P_embeddings)
+                restore(df_person_focus, decoder_model, encoder_type, model_path, out_directory, cent_all[i], 'lala')
+            else:
+                raise ValueError("Napaka")
 
-            for j in range(1, divide+1):
+            '''for j in range(1, divide+1):
                 #multiply *= 10**(2/divide)
                 num+=1
                 if segment:
                     df_person_focus = tranform_to_img(df_person_focus, vector_new, multiply, 'centroid', encoder_type, decoder_model, model_path, out_directory, num, save=save)
                 else:
-                    df_person = tranform_to_img(df_person, vector_new, multiply, 'centroid', encoder_type, decoder_model, model_path, out_directory, num, save=save)
+                    df_person = tranform_to_img(df_person, vector_new, multiply, 'centroid', encoder_type, decoder_model, model_path, out_directory, num, save=save)'''
                     
 
 

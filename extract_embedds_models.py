@@ -59,10 +59,15 @@ def main(args):
     if os.path.isdir(in_model_directory):
         in_model_directory_list = os.listdir(in_model_directory)
         for preprocessing in in_model_directory_list:
+            if preprocessing != 'mtcnn':
+                continue
             prep_dir = os.path.join(in_model_directory, preprocessing)
             if os.path.isdir(prep_dir):
                 prep_dir_list = os.listdir(prep_dir)
                 for model_subdir in prep_dir_list:
+
+                    if model_subdir != 'vgg-vgg':
+                        continue
                     model_dir = os.path.join(prep_dir, model_subdir)
                     if os.path.isdir(model_dir):
                         print(f"Now processing in directory: {model_dir}")

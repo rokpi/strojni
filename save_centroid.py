@@ -31,7 +31,6 @@ def calculate_centroids(df, what):
     centroids_by_angle = df.groupby(what)['centred_embedding'].apply(
         lambda embeddings: np.mean(np.vstack(embeddings), axis=0)
     )
-    
     # Converts to dataframe
     centroids_df = pd.DataFrame(centroids_by_angle).reset_index()
     
@@ -64,9 +63,9 @@ def save_bulk(centroids, fileDirectory, what):
 
 def argparser():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--inputs', default=r'/home/rokp/test/models/retinaface/resnet-vgg/resnet-vggmtcnn_images_mtcnn.npz', type=str, help='Path to the embeddings')
+    parser.add_argument('--inputs', default=r'/home/rokp/test/models/mtcnn/vgg-vgg/vgg-vggmtcnn_images_mtcnn.npz', type=str, help='Path to the embeddings')
     parser.add_argument('--out_dir', default=r'/home/rokp/test/bulk', type=str, help='Output directory where the embeddings will be saved.')
-    parser.add_argument('--what', default='light', type=str, help='Which centroid to create.')
+    parser.add_argument('--what', default='angle', type=str, help='Which centroid to create.')
     args = parser.parse_args()
     return args
 
@@ -74,15 +73,19 @@ def main(args):
     what = args.what
     in_directory = args.inputs
     df = load_data_df(in_directory)
+    print(len(df))
+    df = df.iloc[:47000]
+    print(len(df))
+    #df[what] = df[what].apply(lambda x: x.item())
     #unique_values = df[what].unique()
     #print(unique_values)
 
     current_date = datetime.now().strftime("%Y%m%d_%H%M%S")
     fileDirectory = os.path.join(args.out_dir, f"{current_date}_{what}")
     create_directory(fileDirectory)
-    '''eigenvectors, eigenvalues = get_pca_vectors(df)
+    eigenvectors, eigenvalues = get_pca_vectors(df)
     np.save(os.path.join(fileDirectory, 'eigenvectors.npy'), eigenvectors)
-    np.save(os.path.join(fileDirectory, 'eigenvalues.npy'), eigenvalues)'''
+    np.save(os.path.join(fileDirectory, 'eigenvalues.npy'), eigenvalues)
     
     global_mean = np.mean(np.vstack(df['embedding']), axis=0).reshape(1, -1)
     centroids = centre_data_people(df, what)
