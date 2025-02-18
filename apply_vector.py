@@ -83,10 +83,8 @@ def init_file_matrix(model_path, out_dir, vector, neut, pos):
     create_directory(out_directory)
     return matrix_dir, out_directory
 
-def restore(df, decoder_model, encoder_type, model_path, out_dir, neut, method):
-    out_directory = create_directory(os.path.join(out_dir, str(neut)))
-    df = df[df['angle'] == neut]
-    for index, item in tqdm(df.iterrows(), total=len(df)):
+def restore(df, decoder_model, encoder_type, model_path, out_directory, method):
+    for index, item in df.iterrows():#tqdm(df.iterrows(), total=len(df)):
         embedding = item['embedding']
         img_dir = item['img_dir']
         

@@ -15,10 +15,10 @@ def calculate_tempCentre(df):
     return grouped
 
 def centre_and_norm_embedds(df, grouped):
-    # Groups tempCentree with original Dataframe
+    # tempCenter of every person
     df = df.merge(grouped[['tempCentre']], left_on='person', right_index=True)
     
-    # subtract
+    # subtract tempcenter from all embeddings, depending on person
     df['centred_embedding'] = df.apply(lambda row: row['embedding'] - row['tempCentre'], axis=1)
 
     std_devs = grouped['embeddings'].apply(lambda embeddings: np.std(embeddings, axis=0))
@@ -44,7 +44,7 @@ def save_centroids(centroids, fileDirectory):
 
 def solve_eigenproblem(C):
     eigenvalues, eigenvectors = np.linalg.eig(C)
-    idx= np.argsort(eigenvalues, axis=0)[::-1]
+    idx= np.argsort(np.abs(eigenvalues), axis=0)[::-1]
     eigenvalues = eigenvalues[idx]
     eigenvectors = eigenvectors[:, idx]
     return eigenvalues, eigenvectors
@@ -60,7 +60,7 @@ def get_pca_vectors(df, people = None):
 
     N = norm_embedds.shape[0]
     norm_embedds = norm_embedds.reshape(-1, norm_embedds.shape[2])
-    covarianceMatrix = 1/(N * (N-1) - 1) * np.dot(norm_embedds.T, norm_embedds)
+    covarianceMatrix = (1/N-1) * np.dot(norm_embedds.T, norm_embedds)#1/(N * (N-1) - 1)
     eigenvalues, eigenvectors = solve_eigenproblem(covarianceMatrix)
     return eigenvectors, eigenvalues
 

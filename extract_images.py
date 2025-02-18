@@ -1,7 +1,7 @@
 import os
 import argparse
 
-from utils.utils_new import  create_directory, getAngle,get_all_filepaths
+from my_utils.utils_new import  create_directory, getAngle,get_all_filepaths
 from tqdm import tqdm
 from datetime import datetime
 import shutil
@@ -10,7 +10,7 @@ def argparser():
     parser = argparse.ArgumentParser()
     parser.add_argument('--out_dir', default=r'/home/rokp/test/images_extract', type=str, help='Output directory where the embeddings will be saved.')
     parser.add_argument('--target', default='txt', type=str, help='What images to copy (txt or frontal(of all people))')    
-    parser.add_argument('--inputs', default=r'/home/rokp/test/images/images_raw_jpg', type=str, help='A file containing the names of test images, an input image or a directory containing the input images.') 
+    parser.add_argument('--inputs', default=r'/home/rokp/test/images/images_mtcnn', type=str, help='A file containing the names of test images, an input image or a directory containing the input images.') 
     parser.add_argument('--txt', default='/home/rokp/test/strojni/launch/launch_test_arcface.txt', type=str, help='Directory to text file.')     
     args = parser.parse_args()
     return args
