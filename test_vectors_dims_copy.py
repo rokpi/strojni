@@ -66,21 +66,20 @@ def get_cos_sim(sim_array):
     return sim
 
 def main():
-    centroid_directory = '/home/rokp/test/bulk/20250207_122859_light'
+    centroid_directory = '/home/rokp/test/dataset/mtcnn/arcface-resnet/20250503_multipie_vse/20250305_104552_angle'
+    in_directory = '/home/rokp/test/dataset/mtcnn/arcface-resnet/20250503_multipie_vse/arcface-resnetconv4_3_3x3_images_mtcnn.npz'
+    model_path = '/home/rokp/test/models/mtcnn/arcface-resnet/arcface-resnet.conv4_3_3x3.20231029-120710.hdf5'
+
     out_dir = '/home/rokp/test/test'
-    in_directory = '/home/rokp/test/dataset/mtcnn/vgg-vgg/20241111_124312_vgg/vgg-vggmtcnn_images_mtcnn.npz'
     txt_dir_train = '/home/rokp/test/strojni/launch/launch_train_arcface.txt'
-    model_path = '/home/rokp/test/models/mtcnn/vgg-vgg/vgg-vgg.mtcnn.conv4_3.20230124-204737.hdf5'
-    start_idx = 0#-90
-    end_idx = 10#90
-    alpha = 1
     lim__maxmul = 100
     divide = 1
 
+    original_idx = 5
     save = True
     limit_space = True
-    segment = True
-    people = ['001']#, '028', '042', '049', '086', '133']#read_txt(txt_dir)
+    segment = False
+    people = ['001', '028', '042', '031', '133']#read_txt(txt_dir)
     cent_basename = os.path.basename(centroid_directory)
     cent_type = cent_basename[16:21]
     if cent_type == 'angle':
@@ -91,16 +90,8 @@ def main():
         cent_all = get_all_lights()
         exclude = 'angle'
         exclude_focus = 0
-
-
-    '''if end_idx + 1 > len(cent_all):
-        raise ValueError(f"Too many. Demanded end idx: {end_idx}\n Length of cent_all: {len(cent_all)}")
-    elif end_idx+1 == len(cent_all):
-        print('Vse...')
-    else:
-        cent_all = cent_all[start_idx:end_idx+1]'''
     
-    cent_all = [i for i in range(1, 14)]
+    #Scent_all = [i for i in range(1, 14)]
     all_centroids = []
     for i in range(len(cent_all)):
         #if all_angles[i] in selection:
@@ -112,41 +103,9 @@ def main():
             all_centroids.append(vector)
 
     df = load_data_df(in_directory)
-    #df = df[df['light'].isin([i for i in range(0, 19)])]
-    print(len(df))
-    #unique_values = df['angle'].unique()
-    print(len(df['person'].unique()))
-    #print(len(df['angle'].unique()))
-    #print(len(df['light'].unique()))
-    eigenvectors =np.load(find_centroid("eigenvectors.npy", centroid_directory))
+    #eigenvectors =np.load(find_centroid("eigenvectors.npy", centroid_directory))
     global_mean = np.mean(np.vstack(df['embedding']), axis=0).reshape(1, -1)
-    df['embedding'] = df['embedding'].apply(lambda x: x - global_mean)
-
-    #df = df[df[exclude] == exclude_focus]
-    test_embeddings = []
-
-    for j in range(len(cent_all)):
-        tmp_embed = all_centroids[7]-all_centroids[j]
-        test_embeddings.append(tmp_embed)
-
-    test_embeddings = np.vstack(test_embeddings)
-    norms = np.linalg.norm(test_embeddings, axis = 1)
-    test_embeddings = test_embeddings / norms[:, np.newaxis]
-    test_embedds_1 = test_embeddings[8:][::-1]#od 9 naprej
-    test_embedds_2 = test_embeddings[:5]
-    P21 = get_P_np(test_embedds_1, 5)
-    P22 = get_P_np(test_embedds_1, 2)
-    P23 = get_P_np(test_embedds_1, 1)
-
-    P11 = get_P_np(test_embedds_2, 5)
-    P12 = get_P_np(test_embedds_2, 2)
-    P13 = get_P_np(test_embedds_2, 1)
-    #P20 = get_P_np(test_embeddings[:6], 5)
-    #P21 = get_P_np(test_embeddings[4:6], 1) 
-    #P11 = get_P_np(test_embeddings[9:11], 1)
-    #P10 = get_P_np(test_embeddings[9:], 5)
-
-
+    #df['embedding'] = df['embedding'].apply(lambda x: x - global_mean)
 
     current_date = datetime.now().strftime("%Y%m%d_%H%M%S")    
     #dirname = f"{current_date}_{cent_type}_{ang_to_str(cent_all[start_idx])}_to_{ang_to_str(cent_all[end_idx])}"
@@ -159,77 +118,65 @@ def main():
     decoder_model, encoder_type = init_decoder(model_path)
 
     if not segment: 
-        df= df[df[cent_type] ==cent_all[start_idx]]
+        df= df[df[cent_type] == cent_all[original_idx]]
+        all_vectors = []
+        for i in range(len(cent_all)):
+            if i == original_idx:
+                all_vectors.append(np.zeros(all_centroids[0].shape))
+            else:
+                all_vectors.append(all_centroids[i]-all_centroids[original_idx])
+
     
     #maxmul = eigenvalues*lim__maxmul#(eigenvalues/eigenvalues[0])*lim__maxmul
-    multiply = alpha/divide
-    #multiply = 10**(-2)
-    df = df[df['light'] == 1]#.isin([i for i in range(1, 14)])]
-    df = df[df['angle'] == 0]
-
-    cosine_sim_1 = []
-    cosine_sim_2 = []
-    cosine_sim_3 = []
+    df = df[df['light'] == 7]
+    #df = df[df['angle'] == 0]
 
     for person in people:
         out_directory = create_directory(os.path.join(out, person))
         df_person = df[df['person'] == person]
-        embeddings = np.vstack(df_person['embedding'])
-        #vector = np.zeros_like(eigenvectors[0]) 
-        for i in tqdm(range(1, len(cent_all)), total = len(cent_all) - 1):
-            #if segment:
-            #    df_person_focus = df_person[df_person[cent_type] == cent_all[i]].copy(deep = True)            
+        if not segment:
+            embeddings = np.vstack(df_person['embedding']) - global_mean
+            img_dirs = df_person['img_dir'].to_list()
 
-            #if len(df_person_focus) == 0:
-            #    continue
-            vector_new = all_centroids[i-1]-all_centroids[i]
-            #vector_new=0
-            embeddings += vector_new
+        for i in tqdm(range(0, len(cent_all)), total = len(cent_all)):
+            if segment:
+                df_person_focus = df_person[df_person[cent_type] == cent_all[i]].copy(deep = True)  
+                if len(df_person_focus) == 0:
+                    continue
+          
+                embeddings = np.vstack(df_person_focus['embedding']) - global_mean
+                img_dirs = df_person_focus['img_dir'].to_list()
 
-            #vector_new = vector/np.linalg.norm(vector)
-
-            '''coeficients = np.dot(eigenvectors.T, vector)
-            
-            #realizira gede na omejeno območje
-            maska = np.abs(maxmul) < np.abs(coeficients)
-            
-            if limit_space:
-                coeficients[maska] = np.sign(coeficients[maska]) * np.abs(maxmul[maska])
-            
-            vector_new = np.dot(eigenvectors, coeficients)'''
-
-                #embeddings = np.vstack(df_person_focus['embedding'])
-                #P_embeddings = np.dot(P, embeddings.T).T
-            if i not in [5, 6, 7, 8, 9]:
-                if i in [1, 2]:
-                    P = P11
-                elif i in [3]:
-                    P = P12                    
-                elif i in [4]:
-                    P = P13
-                elif i in [10]:
-                    P = P23
-                elif i in [11]:
-                    P = P22
-                elif i in [12, 13]:
-                    P = P21
-                P_embeddings = []
-                for k in range(len(embeddings)):
-                    P_embedding = np.dot(P, embeddings[k].reshape(embeddings.shape[1], 1)).T
-                    P_embeddings.append(P_embedding)
-
-                P_embeddings = np.vstack(P_embeddings)
-                if i < 7:
-                    cosine_sim_1.append(P_embeddings.copy())
-                else: 
-                    cosine_sim_3.append(P_embeddings.copy())
-                P_embeddings = P_embeddings + global_mean                  
-                #df_person['embedding'] = list(P_embeddings)
+                vector_new = all_centroids[i]-all_centroids[i-1]
+                vector_new=0
             else:
-                cosine_sim_2.append(embeddings.copy())
-                #df_person['embedding'] = list(embeddings+global_mean)
+                vector_new = all_vectors[i]
+
+            vector_new /= divide
+            
+            
             #out_dir = create_directory(os.path.join(out_directory, str(cent_all[i])))
-            #restore(df_person, decoder_model, encoder_type, model_path, out_directory,'lala')
+            for j in range(1, divide+1):
+                embeddings_vec = embeddings + vector_new
+                img_dirs_vec = [img_dir[:-25] + str(cent_all[i]) + ".jpg" for img_dir in img_dirs]
+
+                #vector_new = vector/np.linalg.norm(vector)
+
+                '''coeficients = np.dot(eigenvectors.T, vector)
+                
+                #realizira gede na omejeno območje
+                maska = np.abs(maxmul) < np.abs(coeficients)
+                
+                if limit_space:
+                    coeficients[maska] = np.sign(coeficients[maska]) * np.abs(maxmul[maska])
+                
+                vector_new = np.dot(eigenvectors, coeficients)'''
+                if segment:
+                    if save:
+                        restore(embeddings_vec + global_mean, img_dirs_vec, decoder_model, encoder_type, model_path, out_directory, num = j)
+                else:
+                    if save:
+                        restore(embeddings_vec + global_mean, img_dirs_vec, decoder_model, encoder_type, model_path, out_directory, num = j)
 
             '''for j in range(1, divide+1):
                 #multiply *= 10**(2/divide)
@@ -239,13 +186,7 @@ def main():
                 else:
                     df_person = tranform_to_img(df_person, vector_new, multiply, 'centroid', encoder_type, decoder_model, model_path, out_directory, num, save=save)'''
     
-    print("podobnost...")
-    all_sim = []
-    all_sim.append(get_cos_sim(cosine_sim_1))
-    all_sim.append(get_cos_sim(cosine_sim_2))
-    all_sim.append(get_cos_sim(cosine_sim_3))
-    all_sim = np.vstack(all_sim)
-    print(f"Skupaj: {np.mean(all_sim):.5f}")
+        print(f"Files successfuly saved in {out_directory}")
 
 if __name__ == '__main__':
   main()

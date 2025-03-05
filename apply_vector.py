@@ -83,13 +83,14 @@ def init_file_matrix(model_path, out_dir, vector, neut, pos):
     create_directory(out_directory)
     return matrix_dir, out_directory
 
-def restore(df, decoder_model, encoder_type, model_path, out_directory, method):
-    for index, item in df.iterrows():#tqdm(df.iterrows(), total=len(df)):
-        embedding = item['embedding']
-        img_dir = item['img_dir']
+def restore(embeddings, img_dirs, decoder_model, encoder_type, model_path, out_directory, num):
+    for i in range(len(embeddings)):#tqdm(df.iterrows(), total=len(df)):
+        embedding = embeddings[i]
+        img_dir = img_dirs[i]
+        if num != 1:
+            name_only, end = os.path.splitext(img_dir)
+            img_dir = name_only + f"_{str(num)}" + end
         
-        if method == 'rotation':
-            embedding = rotational_to_cartesian(embedding)
         embedding = define_tranform(embedding, encoder_type, model_path)
         out_arr = decoder_model.predict(embedding)
 

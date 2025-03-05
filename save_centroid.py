@@ -63,9 +63,9 @@ def save_bulk(centroids, fileDirectory, what):
 
 def argparser():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--inputs', default=r'/home/rokp/test/dataset/mtcnn/vgg-vgg/multipie_vse/vgg-vggmtcnn_images_mtcnn.npz', type=str, help='Path to the embeddings')
+    parser.add_argument('--inputs', default=r'/home/rokp/test/dataset/mtcnn/vgg-resnet/20250305_multipie_vse/vgg-resnetmtcnn_images_mtcnn.npz', type=str, help='Path to the embeddings')
     parser.add_argument('--out_dir', default=r'/home/rokp/test/bulk', type=str, help='Output directory where the embeddings will be saved.')
-    parser.add_argument('--what', default='light', type=str, help='Which centroid to create.')
+    parser.add_argument('--what', default='angle', type=str, help='Which centroid to create.')
     args = parser.parse_args()
     return args
 
@@ -82,9 +82,9 @@ def main(args):
     current_date = datetime.now().strftime("%Y%m%d_%H%M%S")
     fileDirectory = os.path.join(args.out_dir, f"{current_date}_{what}")
     create_directory(fileDirectory)
-    eigenvectors, eigenvalues = get_pca_vectors(df)
-    np.save(os.path.join(fileDirectory, 'eigenvectors.npy'), eigenvectors)
-    np.save(os.path.join(fileDirectory, 'eigenvalues.npy'), eigenvalues)
+    #eigenvectors, eigenvalues = get_pca_vectors(df)
+    #np.save(os.path.join(fileDirectory, 'eigenvectors.npy'), eigenvectors)
+    #np.save(os.path.join(fileDirectory, 'eigenvalues.npy'), eigenvalues)
     
     global_mean = np.mean(np.vstack(df['embedding']), axis=0).reshape(1, -1)
     centroids = centre_data_people(df, what)

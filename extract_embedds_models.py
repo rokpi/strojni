@@ -66,7 +66,7 @@ def main(args):
                 prep_dir_list = os.listdir(prep_dir)
                 for model_subdir in prep_dir_list:
 
-                    if model_subdir != 'vgg-vgg':
+                    if model_subdir != 'arcface-resnet':
                         continue
                     model_dir = os.path.join(prep_dir, model_subdir)
                     if os.path.isdir(model_dir):
