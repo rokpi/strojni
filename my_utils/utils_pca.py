@@ -60,7 +60,7 @@ def get_pca_vectors(df, people = None):
 
     N = norm_embedds.shape[0]
     norm_embedds = norm_embedds.reshape(-1, norm_embedds.shape[2])
-    covarianceMatrix = (1/N-1) * np.dot(norm_embedds.T, norm_embedds)#1/(N * (N-1) - 1)
+    covarianceMatrix = (1/(N-1)) * np.dot(norm_embedds.T, norm_embedds)#1/(N * (N-1) - 1)
     eigenvalues, eigenvectors = solve_eigenproblem(covarianceMatrix)
     return eigenvectors, eigenvalues
 

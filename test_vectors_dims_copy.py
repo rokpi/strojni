@@ -5,6 +5,7 @@ from my_utils.utils_new import create_directory, load_data_df, get_all_angles,ge
 from datetime import datetime
 from apply_vector import init_decoder, restore
 from my_utils.utils_test import tranform_to_img, read_txt
+from sklearn.decomposition import PCA
 import math
 
 def get_and_test_vector(df_person, angles):
@@ -66,19 +67,19 @@ def get_cos_sim(sim_array):
     return sim
 
 def main():
-    centroid_directory = '/home/rokp/test/dataset/mtcnn/arcface-resnet/20250503_multipie_vse/20250305_104552_angle'
-    in_directory = '/home/rokp/test/dataset/mtcnn/arcface-resnet/20250503_multipie_vse/arcface-resnetconv4_3_3x3_images_mtcnn.npz'
-    model_path = '/home/rokp/test/models/mtcnn/arcface-resnet/arcface-resnet.conv4_3_3x3.20231029-120710.hdf5'
+    centroid_directory = '/home/rokp/test/dataset/mtcnn/resnet-vgg/20250503_multipie_vse/20250305_104313_light'
+    in_directory = '/home/rokp/test/dataset/mtcnn/resnet-vgg/20250503_multipie_vse/resnet-vggmtcnn_images_mtcnn.npz'
+    model_path = '/home/rokp/test/models/mtcnn/resnet-vgg/resnet-vgg.mtcnn.conv4_3.20230124-202043.hdf5'
 
     out_dir = '/home/rokp/test/test'
     txt_dir_train = '/home/rokp/test/strojni/launch/launch_train_arcface.txt'
     lim__maxmul = 100
     divide = 1
 
-    original_idx = 5
+    original_idx = 7
     save = True
     limit_space = True
-    segment = False
+    segment = True
     people = ['001', '028', '042', '031', '133']#read_txt(txt_dir)
     cent_basename = os.path.basename(centroid_directory)
     cent_type = cent_basename[16:21]
@@ -128,8 +129,8 @@ def main():
 
     
     #maxmul = eigenvalues*lim__maxmul#(eigenvalues/eigenvalues[0])*lim__maxmul
-    df = df[df['light'] == 7]
-    #df = df[df['angle'] == 0]
+    #df = df[df['light'] == 7]
+    df = df[df['angle'] == 0]
 
     for person in people:
         out_directory = create_directory(os.path.join(out, person))

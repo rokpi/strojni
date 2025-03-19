@@ -9,6 +9,7 @@ import os
 import torch
 from torch.utils.data import Dataset, DataLoader
 from openpyxl import Workbook
+from sklearn.decomposition import PCA
 
 def clean_df(df, array, angles = None):
   img_dirs = array[:, 1]
@@ -134,7 +135,7 @@ class Embeddings2Dataset(Dataset):
         return sample.unsqueeze(0)     # oblika: (1, 3, 512)
 
 
-def check_torch_all(df, weights, all_centroids, eigenvectors, angles_are, cent_type):
+def check_torch_all(df, weights, all_centroids, eigenvectors, angles_are, cent_type, go_PCA = True):
   device = 'cuda' if torch.cuda.is_available() else 'cpu'
   wrong = 0
   right = 0
@@ -146,22 +147,32 @@ def check_torch_all(df, weights, all_centroids, eigenvectors, angles_are, cent_t
   df_copy = df.copy()
   #average
   #result
-  all_centroids_torch = torch.tensor(all_centroids, device = device, dtype=torch.float32)
+  all_centroids_torch = torch.tensor(all_centroids, device = device, dtype=torch.float32).squeeze()
 
   weights = torch.tensor(np.array(weights), dtype=torch.float32)
-  embeddings2 = torch.tensor(np.vstack(array_all), device = device, dtype=torch.float32)
-  #embeddings1 = torch.tensor(np.vstack(array_test[:, embedding_num]), device = device, dtype=torch.float32)
+
+  np_array_all = np.vstack(array_all)
+
+  if go_PCA:
+    pca = PCA(n_components=3)
+    X_pca = pca.fit_transform(np_array_all)
+
+    '''pca = PCA(n_components=np_array_all.shape[1])
+    X_pca = pca.fit_transform(np_array_all)
+
+    # Nastavi prve tri PCA komponente na nič
+    X_pca[:, :1] = 0'''
+
+    # Rekonstruiraj podatke z uporabo obrnjenega PCA (dimenzionalnost ostane enaka)
+    np_array_all = pca.inverse_transform(X_pca)
+    df['embedding'] = np_array_all.tolist()
+
+  embeddings2 = torch.tensor(np_array_all, device = device, dtype=torch.float32).squeeze()
+
   weights_array = weights.view(-1, 1)
   weights_vec = weights_array.repeat(1, embeddings2.shape[1]).to(device)
   target_idx = 5
   target_idx = torch.tensor(target_idx, device=device)
-
-  # Compute distances for the test embedding
-  '''vectors1 = embeddings1[:, None, :] - all_centroids_torch
-  distances1 = torch.norm(vectors1, dim=2)
-  all_results1 = torch.argmin(distances1, dim=1)
-  del vectors1
-  del distances1'''
 
   # Compute distances for all test group embeddings
   vectors2 = embeddings2[:, None, :] - all_centroids_torch
@@ -187,39 +198,47 @@ def check_torch_all(df, weights, all_centroids, eigenvectors, angles_are, cent_t
     del array_right
     del mask_right
     del unique_values
-  all_embeddings1_cent = all_centroids_torch[results2].cpu().numpy()#[None,:]#.clone().detach().to(device).to(torch.float32)
-  #all_results = (all_results1[:, None] - results2[None, :]).cpu().numpy()
-  #all_results1 = all_results1.cpu().numpy()
 
-  #df_test = pd.DataFrame(array_test)
+
+  all_embeddings1_cent = all_centroids_torch[results2].cpu().numpy()#[None,:]#.clone().detach().to(device).to(torch.float32)
+
   df_copy['results1'] = results2.cpu().numpy()
-  #df_test['results'] = list(all_results)
   df_copy['centroid'] = list(all_embeddings1_cent)
   del all_embeddings1_cent
 
+  '''
   test_vectors = []
-  selection = [i for i in range(1,15) if i != 7]
-  for j in selection:
-    tmp_embed = all_centroids[7]-all_centroids[j]
-    test_vectors.append(tmp_embed)
+  
+  if cent_type == 'angle':
+    selection = [i for i in range(3,8) if i != 5]
+    for j in selection:
+      tmp_embed = all_centroids[5]-all_centroids[j]
+      test_vectors.append(tmp_embed)
+
+  elif cent_type == 'light':
+    selection = [i for i in range(1,15) if i != 7] 
+    for j in selection:
+      tmp_embed = all_centroids[7]-all_centroids[j]
+      test_vectors.append(tmp_embed)
 
   test_vectors = np.vstack(test_vectors)
   norms = np.linalg.norm(test_vectors, axis = 1)
   test_vectors = test_vectors / norms[:, np.newaxis]
   test_embedds_1 = np.vstack(test_vectors[7:][::-1])#od 9 naprej
-  test_embedds_2 = np.vstack(test_vectors[:5])
+  test_embedds_2 = np.vstack(test_vectors[:5])'''
 
-  P21 = get_P(test_embedds_1, 5, device)
+  '''P21 = get_P(test_embedds_1, 5, device)
   P22 = get_P(test_embedds_1, 2, device)
   P23 = get_P(test_embedds_1, 1, device)
 
   P11 = get_P(test_embedds_2, 5, device)
   P12 = get_P(test_embedds_2, 2, device)
-  P13 = get_P(test_embedds_2, 1, device)
+  P13 = get_P(test_embedds_2, 1, device)'''
 
   #P2, P_embeddings2_2 = get_P(eigenvectors, 2, embeddings2, device)
-  P3 = get_P(eigenvectors, 3, device)
-  P_embeddings2_3 = torch.mm(P3, embeddings2.T).T
+  #P3 = get_P(eigenvectors, 3, device)
+  #P_embeddings2_3 = torch.mm(P3, embeddings2.T).T
+
   '''P4, P_embeddings2_4 = get_P(eigenvectors, 4, embeddings2, device)
   P5, P_embeddings2_5 = get_P(eigenvectors, 5, embeddings2, device)
   P10, P_embeddings2_10 = get_P(eigenvectors, 10, embeddings2, device)
@@ -233,7 +252,7 @@ def check_torch_all(df, weights, all_centroids, eigenvectors, angles_are, cent_t
 
 
   dataset = EmbeddingDatasetAll(df_copy)
-  dataloader = DataLoader(dataset, batch_size=100, num_workers=6, shuffle=False)
+  dataloader = DataLoader(dataset, batch_size = 100, num_workers=6, shuffle=False)
   with torch.no_grad():
       for batch in tqdm(dataloader, desc="Processing batches", unit="batch"):
         person = batch['person']
@@ -241,8 +260,9 @@ def check_torch_all(df, weights, all_centroids, eigenvectors, angles_are, cent_t
         original_indices = batch['original_index']
         results1 = batch['results1'].to(device)
         embeddings1 = batch['embedding'].squeeze(1).to(device)
-        embeddings1_cent = batch['centroid'].to(device)
 
+        embeddings1_cent = batch['centroid'].to(device).squeeze()
+        shape = [len(embeddings1),len(results2), 1]
 
         results = results1.unsqueeze(1)-results2.unsqueeze(0)
         # Rotate embedding one
@@ -254,6 +274,10 @@ def check_torch_all(df, weights, all_centroids, eigenvectors, angles_are, cent_t
         del mask_no_rot
         del vectors_rot_one
 
+        #rotate one
+        rot_one = compute_cosine_similarities_torch(embeddings1.unsqueeze(1), emb2_rot_one).reshape(shape)    
+        del emb2_rot_one
+
         # Rotate embedding both
         mask_target_rot1 = (results1 != target_idx).view(-1, 1).repeat(1, embeddings1.shape[1])
         mask_target_rot2 = (results2 != target_idx).view(-1, 1).repeat(1, embeddings1.shape[1])
@@ -261,6 +285,11 @@ def check_torch_all(df, weights, all_centroids, eigenvectors, angles_are, cent_t
         emb2_rot_both = embeddings2 + mask_target_rot2 * all_centroids_torch[target_idx]
         del mask_target_rot1
         del mask_target_rot2
+
+        #rotate both
+        rot_both = compute_cosine_similarities_torch(emb1_rot_both.unsqueeze(1), emb2_rot_both.unsqueeze(0)).reshape(shape)
+        del emb1_rot_both
+        del emb2_rot_both
 
         # Calculate average weight
         '''vectors1_avg = torch.vstack([torch.cat([all_centroids_torch[:results1[i]], all_centroids_torch[results1[i] + 1:]]).unsqueeze(0) for i in range(len(results1))])
@@ -276,16 +305,11 @@ def check_torch_all(df, weights, all_centroids, eigenvectors, angles_are, cent_t
 
         vectors1_avg = torch.vstack([torch.cat([all_centroids_torch[:results1[i]], all_centroids_torch[results1[i] + 1:]]).unsqueeze(0) for i in range(len(results1))])
         embs1_avg = torch.cat((embeddings1.unsqueeze(1), embeddings1.unsqueeze(1) + vectors1_avg), dim=1)
-
+        del vectors1_avg
+        
         vectors2_avg = torch.vstack([torch.cat([all_centroids_torch[:results2[i]], all_centroids_torch[results2[i] + 1:]]).unsqueeze(0) for i in range(len(results2))])
         embs2_avg = torch.cat((embeddings2.unsqueeze(1), embeddings2.unsqueeze(1) + vectors2_avg), dim=1)
-
-        sims_1 =[]
-        sims_2 =[]
-        sims_3 =[]
-        dataset = Embeddings2Dataset(embs2_avg)
-        batch_size = 256  # Nastavi batch size glede na razpoložljivo pomnilniško zmogljivost
-        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
+        del vectors2_avg
 
         '''embs1_P = []
         for i in range(1,14):
@@ -309,49 +333,58 @@ def check_torch_all(df, weights, all_centroids, eigenvectors, angles_are, cent_t
         
         embs1_P = torch.cat(embs1_P, dim = 1)'''
 
+        if cent_type == 'angle':
+          start_idx = 3
+          end_idx = 8
+        if cent_type == 'light':
+           start_idx = 5
+           end_idx = 10
+
+        sims_1 =[]
+        sims_2 =[]
+        sims_3 =[]
+        dataset2 = Embeddings2Dataset(embs2_avg)
+        batch_size = 256  # Nastavi batch size glede na razpoložljivo pomnilniško zmogljivost
+        dataloader2 = DataLoader(dataset2, batch_size=batch_size, shuffle=False)
+
         # Iteriramo čez batch-e embeddings2
-        for batch in dataloader:
+        for batch2 in dataloader2:
           # DataLoader vrne batch oblike (batch_size, 1, 3, 512)
           # Za naš izračun potrebujemo embeddings2 oblike (1, batch_size, 3, 512)
-          batch = batch.transpose(0, 1)  # Zamenjamo prvo in drugo dimenzijo
+          batch2 = batch2.transpose(0, 1)  # Zamenjamo prvo in drugo dimenzijo
           # Izračunamo kosinusne podobnosti za ta batch:
           #sims_1.append(compute_cosine_similarities_pairs_3(embs1_avg[:,1:5,:].unsqueeze(1), batch[:,:,1:5,:])) 
-          sims_2.append(compute_cosine_similarities_pairs_3(embs1_avg[:,5:10,:].unsqueeze(1), batch[:,:,5:10,:])) 
+          sims_2.append(compute_cosine_similarities_pairs_3(embs1_avg[:,start_idx:end_idx,:].unsqueeze(1), batch2[:,:,5:10,:])) 
           #sims_3.append(compute_cosine_similarities_pairs_3(embs1_avg[:,10:15,:].unsqueeze(1), batch[:,:,10:15,:]))
 
 
         sum_avg = weights.sum()
         embs1_avg = torch.sum((weights_vec.unsqueeze(0) * embs1_avg), dim=1)/ sum_avg
-        del vectors1_avg
+
+        #average one
+        avg_one = compute_cosine_similarities_torch(embs1_avg.unsqueeze(1), embeddings2.unsqueeze(0)).reshape(shape)
+
+
         embs2_avg = torch.sum((weights_vec.unsqueeze(0) * embs2_avg), dim=1)/ sum_avg
-        del vectors2_avg
+
+        #average both
+        avg_both = compute_cosine_similarities_torch(embs1_avg.unsqueeze(1), embs2_avg.unsqueeze(0)).reshape(shape)
+        del embs1_avg
+        del embs2_avg
 
         #test_tensor_1 = torch.cat(sims_1, dim = 1)
         test_tensor_2 = torch.cat(sims_2, dim = 1)
         #test_tensor_3 = torch.cat(sims_3, dim = 1)
 
-        shape = [len(embeddings1),len(results2), 1]
-        avg_one = (torch.mean(test_tensor_2, dim = 2)).reshape(shape)# + torch.mean(test_tensor_2, dim = 2)+ torch.mean(test_tensor_3, dim = 2)).reshape(shape)
+        sim_3 = (torch.mean(test_tensor_2, dim = 2)).reshape(shape)# + torch.mean(test_tensor_2, dim = 2)+ torch.mean(test_tensor_3, dim = 2)).reshape(shape)
+
         #normal
         normal = compute_cosine_similarities_torch(embeddings1.unsqueeze(1), embeddings2.unsqueeze(0)).reshape(shape)
-        #rotate one
-        rot_one = compute_cosine_similarities_torch(embeddings1.unsqueeze(1), emb2_rot_one).reshape(shape)    
-        #rotate both
-        rot_both = compute_cosine_similarities_torch(emb1_rot_both.unsqueeze(1), emb2_rot_both.unsqueeze(0)).reshape(shape)
-        #average one
-        #avg_one = compute_cosine_similarities_torch(embs1_avg.unsqueeze(1), embeddings2.unsqueeze(0)).reshape(shape)
-        #average both
-        avg_both = compute_cosine_similarities_torch(embs1_avg.unsqueeze(1), embs2_avg.unsqueeze(0)).reshape(shape)
 
+        #emb1_P3 = torch.mm(P3, embeddings1.T).T
 
-        del emb2_rot_one
-        del emb1_rot_both
-        del emb2_rot_both
-        del embs1_avg
-        del embs2_avg
+        #sim_3 = compute_cosine_similarities_torch(emb1_P3.unsqueeze(1), P_embeddings2_3.unsqueeze(0)).reshape(shape)
 
-        emb1_P3 = torch.mm(P3, embeddings1.T).T
-        sim_3 = compute_cosine_similarities_torch(emb1_P3.unsqueeze(1), P_embeddings2_3.unsqueeze(0)).reshape(shape)
         '''emb1_P2 = torch.mm(P2, embeddings1.T).T
         sim_2 = compute_cosine_similarities_torch(emb1_P2.unsqueeze(1), P_embeddings2_2.unsqueeze(0)).reshape(shape)
 
@@ -372,7 +405,7 @@ def check_torch_all(df, weights, all_centroids, eigenvectors, angles_are, cent_t
         del emb1_P10
         del emb1_P25'''
 
-        del emb1_P3
+        #del emb1_P3
         del embeddings1
 
         for i in range(len(person)):
@@ -953,15 +986,20 @@ def get_centroids(df, centroid_directory, selection):
   return all_centroids, angles_are
 
 def main():
-  df = load_data_df('/home/rokp/test/dataset/adaface/cplfw/test_ada.npz')
+  df = load_data_df('/home/rokp/test/dataset/swinface/cplfw/swinface.npz')
   #df = df.iloc[43000:]
+  #prvih35 = [f"{i:03d}" for i in range(1, 36)]
+  #df = df[df['person'].isin(prvih35)]
   #df = df.drop(columns=['light', 'angle'])
-  centroid_dir_ang = '/home/rokp/test/dataset/swinface/svetloba/20250113_093015_angle_multi_47000'
-  centroid_dir_lig = '/home/rokp/test/dataset/adaface/svetloba/20250113_084221_light_multi_43000'
+  go_PCA = False
+  examine = 'angle'
+  centroid_dir_ang = '/home/rokp/test/dataset/swinface/svetloba/20250312_135249_angle_36'
+  centroid_dir_lig = '/home/rokp/test/dataset/swinface/svetloba/20250312_135256_light_36'
   out_dir = '/home/rokp/test/ROC'
   total = 5
   loop = False
-  descriptions = ["Normal", "Rot One", "Rot Both", "Avg one", "Avg both", "P3"]#['2', '3', '4', '5', '10', '25'] #
+
+  descriptions = ["Normal", "Rot One", "Rot Both", "Avg One", "Avg Both", "Avg Cos"]#['2', '3', '4', '5', '10', '25'] #
   #selection = [light for light in range(0,14)]#do 13
   selection_ang = get_all_angles()
   selection_lig = get_all_lights()
@@ -971,7 +1009,8 @@ def main():
   #global_mean = np.load(find_centroid("global.npy", centroid_directory)) 
 
   #df = df[df['light'].isin(selection)]
-  eigenvectors =np.load(find_centroid("eigenvectors.npy", centroid_dir_ang))
+  #eigenvectors =np.load(find_centroid("eigenvectors.npy", centroid_dir_ang))
+  eigenvectors = 0
   global_mean = np.mean(np.vstack(df['embedding']), axis=0).reshape(1, -1)
   df['embedding'] = df['embedding'].apply(lambda x: x - global_mean)
 
@@ -983,8 +1022,13 @@ def main():
   #weights = [10,8,6,4,0,2,0,4,6,8,10]
   weights_ang = np.ones(len(centroids_angles))#[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
   weights_lig = np.ones(len(centroids_lights))#[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-
-  difference, similarity = check_torch_all(df, weights_lig, centroids_lights, eigenvectors, angles_are, 'light')
+  
+  if examine == 'angle':
+    difference, similarity = check_torch_all(df, weights_ang, centroids_angles, eigenvectors, angles_are, 'angle', go_PCA=go_PCA)
+  elif examine == 'light':
+    difference, similarity = check_torch_all(df, weights_lig, centroids_lights, eigenvectors, angles_are, 'light', go_PCA=go_PCA)
+  else:
+    raise ValueError("nepoznan examine")
   #difference, similarity = check_torch_both(df, weights_ang, weights_lig, centroids_angles, centroids_lights, eigenvectors, angles_are)
   calculate_roc(similarity, difference, filepath, descriptions, current_date)
 

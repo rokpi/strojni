@@ -63,9 +63,9 @@ def save_bulk(centroids, fileDirectory, what):
 
 def argparser():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--inputs', default=r'/home/rokp/test/dataset/mtcnn/vgg-resnet/20250305_multipie_vse/vgg-resnetmtcnn_images_mtcnn.npz', type=str, help='Path to the embeddings')
+    parser.add_argument('--inputs', default=r'/home/rokp/test/dataset/adaface/svetloba/ada.npz', type=str, help='Path to the embeddings')
     parser.add_argument('--out_dir', default=r'/home/rokp/test/bulk', type=str, help='Output directory where the embeddings will be saved.')
-    parser.add_argument('--what', default='angle', type=str, help='Which centroid to create.')
+    parser.add_argument('--what', default='light', type=str, help='Which centroid to create.')
     args = parser.parse_args()
     return args
 
@@ -74,7 +74,8 @@ def main(args):
     in_directory = args.inputs
     df = load_data_df(in_directory)
     #df = df[df['light'].isin([1, 7])]
-    #df = df[df['angle'].isin([0])]
+    prvih35 = [f"{i:03d}" for i in range(1, 36)]
+    df = df[~df['person'].isin(prvih35)]
 
     #unique_values = df[what].unique()
     #print(unique_values)
